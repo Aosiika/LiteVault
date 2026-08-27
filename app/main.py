@@ -108,8 +108,8 @@ html, body {{
 /* ─── Layout General ─── */
 .app-layout {{
   display: flex;
-  height: 100vh;
-  overflow: hidden;
+  min-height: calc(100vh - 56px);
+  width: 100%;
 }}
 
 /* ─── Barra de Navegación Superior (Estilo Modrinth App) ─── */
