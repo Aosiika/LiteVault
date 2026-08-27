@@ -91,7 +91,8 @@ html, body {{
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   font-size: 14px;
   height: 100%;
-  overflow: hidden;
+  overflow-y: auto !important;
+  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }}
 
@@ -180,6 +181,8 @@ html, body {{
   width: 260px;
   min-width: 260px;
   height: calc(100vh - 56px);
+  position: sticky;
+  top: 56px;
   background: var(--bg-surface);
   border-right: 1px solid var(--border);
   overflow-y: auto;
@@ -247,15 +250,10 @@ html, body {{
 .q-page {{
   display: flex !important;
   flex-direction: column !important;
-  height: calc(100vh - 56px) !important;
-  min-height: 0 !important;
-  overflow: hidden !important;
+  min-height: calc(100vh - 56px) !important;
 }}
 .main-content {{
   flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
   padding: 20px 24px 40px;
   display: flex;
   flex-direction: column;
@@ -263,9 +261,7 @@ html, body {{
 }}
 .main-content-scroll {{
   flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  width: 100%;
 }}
 .page-title {{
   font-family: 'Outfit', sans-serif;
