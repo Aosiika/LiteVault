@@ -308,7 +308,7 @@ class HomePage:
                     if not filtered:
                         self._render_empty_state()
                     else:
-                        self._render_carousels(session, filtered)
+                        self._render_grouped_recent(session, filtered)
                 return
 
             total_items = len(filtered)
@@ -375,9 +375,8 @@ class HomePage:
             ui.label("No se encontraron litemáticas").classes("empty-title")
             ui.label("Prueba con otra categoría, etiqueta o término de búsqueda.").classes("empty-subtitle")
 
-    def _render_carousels(self, session, all_schematics: list[Schematic]) -> None:
-        """Renderiza las construcciones agrupadas por categoría padre en formato de carrusel horizontal."""
-        # Obtener todas las categorías y mapear hijos a padres
+    def _render_grouped_recent(self, session, all_schematics: list[Schematic]) -> None:
+        """Renderiza las construcciones agrupadas por categoría padre mostrando las más recientes."""
         all_cats = session.exec(select(Category)).all()
         parent_cats = [c for c in all_cats if c.parent_id is None]
         parent_cats.sort(key=lambda x: x.name)
@@ -385,7 +384,6 @@ class HomePage:
         cat_to_parent = {c.id: (c.parent_id if c.parent_id else c.id) for c in all_cats}
         
         groups: dict[int, list[Schematic]] = {p.id: [] for p in parent_cats}
-        # Grupo especial para esquemas sin categoría
         groups[0] = []
         
         for s in all_schematics:
@@ -402,7 +400,9 @@ class HomePage:
                 if not items:
                     continue
                 
-                display_items = items[:15]
+                # Ordenar por ID descendente (más recientes primero) y mostrar hasta 12
+                items.sort(key=lambda x: x.id, reverse=True)
+                display_items = items[:12]
                 
                 with ui.column().classes("w-full gap-3"):
                     with ui.row().classes("items-center justify-between w-full px-2"):
@@ -410,41 +410,38 @@ class HomePage:
                             ui.icon("folder_special", size="1.2rem").style("color: var(--accent)")
                             ui.label(p.name).style("font-size: 1.15rem; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;")
                         
-                        # Al pulsar "Ver Todos", seleccionamos esta categoría en el sidebar
                         ui.button("Ver todos", on_click=lambda _id=p.id: self._on_filter_change(_id, [])).props("flat dense").style("font-size: 0.8rem; color: var(--accent-light);")
                     
-                    # Contenedor horizontal (estilo Netflix)
-                    # Ocultamos la barra de scroll y permitimos deslizar nativamente
-                    with ui.row().classes("w-full flex-nowrap overflow-x-auto gap-4 pb-2 snap-x").style("scroll-behavior: smooth; scrollbar-width: none;"):
+                    # Mostrar en formato de cuadrícula (Grid) tradicional
+                    with ui.element("div").classes("schematics-grid w-full"):
                         for schem in display_items:
-                            with ui.element("div").classes("snap-start shrink-0").style("width: 280px;"):
-                                card = SchematicCard(
-                                    schematic=schem,
-                                    on_select=self._on_card_select,
-                                    on_click=self._on_card_click,
-                                    on_delete=self._on_card_delete,
-                                    is_selected=schem.id in self._selected_ids,
-                                )
-                                self._cards[schem.id] = card
+                            card = SchematicCard(
+                                schematic=schem,
+                                on_select=self._on_card_select,
+                                on_click=self._on_card_click,
+                                on_delete=self._on_card_delete,
+                                is_selected=schem.id in self._selected_ids,
+                            )
+                            self._cards[schem.id] = card
 
-            # Renderizar los sin categoría si los hay
             if groups[0]:
+                groups[0].sort(key=lambda x: x.id, reverse=True)
+                display_items = groups[0][:12]
                 with ui.column().classes("w-full gap-3"):
                     with ui.row().classes("items-center justify-between w-full px-2"):
                         with ui.row().classes("items-center gap-2"):
                             ui.icon("help_outline", size="1.2rem").style("color: var(--text-muted)")
                             ui.label("Sin Categoría").style("font-size: 1.15rem; font-weight: 700; color: var(--text-primary); text-transform: uppercase;")
-                    with ui.row().classes("w-full flex-nowrap overflow-x-auto gap-4 pb-2 snap-x").style("scroll-behavior: smooth; scrollbar-width: none;"):
-                        for schem in groups[0][:15]:
-                            with ui.element("div").classes("snap-start shrink-0").style("width: 280px;"):
-                                card = SchematicCard(
-                                    schematic=schem,
-                                    on_select=self._on_card_select,
-                                    on_click=self._on_card_click,
-                                    on_delete=self._on_card_delete,
-                                    is_selected=schem.id in self._selected_ids,
-                                )
-                                self._cards[schem.id] = card
+                    with ui.element("div").classes("schematics-grid w-full"):
+                        for schem in display_items:
+                            card = SchematicCard(
+                                schematic=schem,
+                                on_select=self._on_card_select,
+                                on_click=self._on_card_click,
+                                on_delete=self._on_card_delete,
+                                is_selected=schem.id in self._selected_ids,
+                            )
+                            self._cards[schem.id] = card
 
     # FAB ─────────────────────────────────────────────────────────────────
 
