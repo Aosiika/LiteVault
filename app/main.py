@@ -244,9 +244,16 @@ html, body {{
 }}
 
 /* ─── Contenido Principal ─── */
+.q-page {{
+  display: flex !important;
+  flex-direction: column !important;
+  height: calc(100vh - 56px) !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}}
 .main-content {{
   flex: 1;
-  height: calc(100vh - 56px);
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 20px 24px 40px;
@@ -256,7 +263,7 @@ html, body {{
 }}
 .main-content-scroll {{
   flex: 1;
-  height: calc(100vh - 56px);
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
 }}
