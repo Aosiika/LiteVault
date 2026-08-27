@@ -1,44 +1,44 @@
 # LiteVault
 
-LiteVault is a high-performance web application designed for storing, organizing, and visualizing Minecraft schematics (.litematic files) directly in the browser. 
+LiteVault es una aplicación de escritorio de alto rendimiento diseñada para almacenar, organizar y visualizar esquemas de Minecraft (archivos `.litematic`) en un entorno nativo.
 
-## Tech Stack
-- **Backend**: FastAPI & Python
-- **Frontend / UI**: NiceGUI (Vue.js under the hood)
-- **Database**: SQLite (SQLModel)
-- **3D Rendering Engine**: Vite + `schematic-renderer` + `Nucleation` (WebAssembly/Rust)
+## Tecnologías
+- **Backend / Core**: FastAPI & Python
+- **Interfaz (UI)**: NiceGUI (ejecutado en modo ventana de escritorio nativa)
+- **Base de Datos**: SQLite (SQLModel)
+- **Motor de Renderizado 3D**: Vite + `schematic-renderer` + `Nucleation` (WebAssembly/Rust)
 
-## Features
-- **Schematic Visualization**: Renders complex `.litematic` files in full 3D within the browser using official Schemat.io packages.
-- **Discord Integration**: Sync service to automatically download, tag, and categorize schematics from Discord channels.
-- **Auto Tagging**: Infers tags like `#redstone`, `#farm`, `#storage`, based on channel context and schematic name.
+## Características Principales
+- **Visualización 3D Integrada**: Renderiza archivos `.litematic` complejos en 3D interactivo utilizando los paquetes oficiales de Schemat.io adaptados a la aplicación.
+- **Integración con Discord**: Servicio de sincronización en segundo plano para descargar automáticamente, etiquetar y clasificar esquemas desde canales de Discord configurados.
+- **Auto-Etiquetado Inteligente**: Infiere etiquetas automáticamente (como `#redstone`, `#farm`, `#storage`, etc.) basándose en el contexto del canal y el nombre del esquema.
 
-## Running Locally
+## Ejecución Local
 
-1. Create a virtual environment:
+1. Crea un entorno virtual:
    ```bash
    python -m venv .venv
    .\.venv\Scripts\activate
    ```
-2. Install dependencies:
+2. Instala las dependencias:
    ```bash
    pip install -r requirements.txt
    ```
-3. Ensure the 3D viewer is built (optional if already built in `app/static/viewer3d`):
+3. Verifica que el módulo 3D esté construido (opcional si ya existe en `app/static/viewer3d`):
    ```bash
    cd viewer_src
    npm install
    npm run build
    cd ..
    ```
-4. Run the app:
+4. Ejecuta la aplicación de escritorio:
    ```bash
    python app/main.py
    ```
-   *The app will be accessible at http://127.0.0.1:8080*
+   *Se abrirá la interfaz gráfica de LiteVault en una ventana.*
 
-## Notes on 3D Rendering (Resource Pack)
-To properly render blocks (including complex redstone states), the `schematic-renderer` requires a valid Minecraft resource pack located at `app/static/viewer3d/pack.zip`.
+## Notas Técnicas sobre el Visor 3D (Resource Pack)
+Para renderizar los bloques correctamente (incluyendo conexiones de redstone complejas y bloques translúcidos), el motor requiere un paquete de texturas de Minecraft válido ubicado en `app/static/viewer3d/pack.zip`.
 
 > [!WARNING]
-> If you update `pack.zip` with a custom resource pack (like VanillaTweaks), make sure that texture references in JSON block models use standard string values (`"texture": "path"`). Nested objects (`"texture": {"sprite": "path"}`) are not natively supported by the Nucleation WASM parser and will cause invisible blocks.
+> Si actualizas el `pack.zip` utilizando paquetes de recursos optimizados (como VanillaTweaks), ten en cuenta que el formato de los modelos JSON debe usar valores de texto convencionales (`"texture": "ruta"`). Los objetos anidados generados por algunos mods o paquetes (`"texture": {"sprite": "ruta"}`) no son soportados de forma nativa por el parser de Nucleation y harán que ciertos bloques (como los polvos de redstone) se vuelvan invisibles si no se corrigen.
