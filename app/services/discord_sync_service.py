@@ -1,0 +1,366 @@
+"""
+discord_sync_service.py — Servicio de sincronización inteligente con cualquier servidor de Discord.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import re
+import time
+import urllib.parse
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+
+import httpx
+from sqlmodel import select
+
+from app.config import BASE_DIR, SCHEMATICS_DIR, STORAGE_DIR
+from app.db.database import create_db_and_tables, get_session
+from app.db.models import Category, Schematic, SchematicTagLink, Tag
+from app.services import file_service
+
+logger = logging.getLogger(__name__)
+
+CONFIG_PATH = STORAGE_DIR / "discord_config.json"
+DEFAULT_GUILD_OR_INVITE = ""
+DEFAULT_TOKEN = ""
+BASE_URL = "https://discord.com/api/v9"
+
+
+def load_discord_config() -> dict:
+    """Carga la configuración de Discord (token, invite_or_guild_id) desde storage/discord_config.json."""
+    if CONFIG_PATH.exists():
+        try:
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {
+        "token": DEFAULT_TOKEN,
+        "invite_or_guild": DEFAULT_GUILD_OR_INVITE,
+        "last_sync": None,
+    }
+
+
+def save_discord_config(token: str, invite_or_guild: Optional[str] = None) -> None:
+    """Guarda la configuración en storage/discord_config.json."""
+    cfg = load_discord_config()
+    cfg["token"] = token.strip()
+    if invite_or_guild:
+        cfg["invite_or_guild"] = invite_or_guild.strip()
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=2, ensure_ascii=False)
+
+
+def normalize_name(name: str) -> str:
+    """Normaliza nombres de canales/categorías para comparación."""
+    return re.sub(r"[^a-z0-9]", "", name.lower())
+
+
+async def resolve_guild(client: httpx.AsyncClient, invite_or_id: str, headers: dict) -> Tuple[str, str]:
+    """
+    Resuelve el ID y nombre del servidor de Discord a partir de:
+    - Enlace de invitación (ej: https://discord.gg/nkGFgD2YW o nkGFgD2YW)
+    - ID numérico del servidor (ej: 1161803566265143306)
+    """
+    cleaned = invite_or_id.strip()
+    # Si es un enlace de invitación
+    code_match = re.search(r"(?:discord\.gg/|discord\.com/invite/)?([a-zA-Z0-9\-]+)$", cleaned)
+    if code_match and not cleaned.isdigit():
+        code = code_match.group(1)
+        r = await client.get(f"{BASE_URL}/invites/{code}", headers=headers)
+        if r.is_success:
+            data = r.json()
+            guild = data.get("guild", {})
+            return str(guild.get("id")), str(guild.get("name", "Servidor de Discord"))
+
+    # Si es un ID directo o fallback
+    if cleaned.isdigit():
+        r = await client.get(f"{BASE_URL}/guilds/{cleaned}", headers=headers)
+        if r.is_success:
+            data = r.json()
+            return str(data.get("id")), str(data.get("name", "Servidor de Discord"))
+        return cleaned, "Servidor de Discord"
+
+    return cleaned, "Servidor de Discord"
+
+
+def ensure_category_hierarchy(session, parent_name: Optional[str], channel_name: str) -> Optional[int]:
+    """
+    Crea dinámicamente o busca la categoría y subcategoría en LiteVault
+    para ajustarse a cualquier estructura de servidor de Discord.
+    """
+    parent_cat_id = None
+    if parent_name and parent_name.strip():
+        p_clean = parent_name.strip()
+        parent_cat = session.exec(
+            select(Category).where(Category.parent_id == None, Category.name.ilike(p_clean))
+        ).first()
+        if not parent_cat:
+            parent_cat = Category(name=p_clean, parent_id=None)
+            session.add(parent_cat)
+            session.commit()
+            session.refresh(parent_cat)
+        parent_cat_id = parent_cat.id
+
+    c_clean = channel_name.strip()
+    # Buscar subcategoría bajo este padre
+    query = select(Category).where(Category.name.ilike(c_clean))
+    if parent_cat_id is not None:
+        query = query.where(Category.parent_id == parent_cat_id)
+    cat = session.exec(query).first()
+
+    if not cat:
+        cat = Category(name=c_clean, parent_id=parent_cat_id)
+        session.add(cat)
+        session.commit()
+        session.refresh(cat)
+
+    return cat.id
+
+
+def build_tag_lookup() -> Dict[str, int]:
+    """Construye un mapa de tags para detección automática de palabras clave."""
+    tag_map: Dict[str, int] = {}
+    with get_session() as session:
+        tags = session.exec(select(Tag)).all()
+        for t in tags:
+            tag_map[t.name.lower()] = t.id
+    return tag_map
+
+
+def detect_tags(text: str, file_name: str, tag_map: Dict[str, int]) -> List[int]:
+    """Detecta tags basados en el texto del mensaje y el nombre del archivo."""
+    combined = f"{text} {file_name}".lower()
+    matched_ids: Set[int] = set()
+
+    keywords = {
+        "redstone": "redstone",
+        "farm": "farm",
+        "granja": "farm",
+        "storage": "storage",
+        "almacen": "storage",
+        "chest": "storage",
+        "auto": "automated",
+        "automated": "automated",
+        "compact": "compact",
+        "compacta": "compact",
+        "survival": "survival-friendly",
+        "nether": "nether",
+        "end": "end",
+        "overworld": "overworld",
+        "villager": "villager",
+        "aldeano": "villager",
+        "iron": "iron",
+        "hierro": "iron",
+        "xp": "xp",
+        "exp": "xp",
+        "furnace": "furnace",
+        "horno": "furnace",
+        "flying": "flying-machine",
+        "voladora": "flying-machine",
+        "duper": "glitch-duper",
+        "dupe": "glitch-duper",
+        "decor": "decoration",
+        "quarry": "quarry-world-eater",
+        "world eater": "quarry-world-eater",
+        "tnt": "quarry-world-eater",
+        "potion": "potion",
+        "pocion": "potion",
+    }
+
+    for kw, tag_name in keywords.items():
+        if kw in combined and tag_name in tag_map:
+            matched_ids.add(tag_map[tag_name])
+
+    return list(matched_ids)
+
+
+async def sync_discord_async(
+    progress_callback: Optional[Callable[[str, int, int], None]] = None
+) -> Tuple[int, int, str]:
+    """
+    Ejecuta la sincronización asíncrona con cualquier servidor de Discord.
+    """
+    create_db_and_tables()
+    cfg = load_discord_config()
+    token = cfg.get("token") or DEFAULT_TOKEN
+    invite_or_guild = cfg.get("invite_or_guild") or DEFAULT_GUILD_OR_INVITE
+
+    if not token or not token.strip():
+        raise ValueError("No hay un token de Discord configurado.")
+
+    headers = {
+        "Authorization": token.strip(),
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+        "Accept": "*/*",
+    }
+
+    tag_map = build_tag_lookup()
+
+    # Cargar nombres existentes en memoria para comprobación O(1) instantánea
+    with get_session() as session:
+        existing_names: Set[str] = {
+            s.name.lower().strip()
+            for s in session.exec(select(Schematic.name)).all()
+            if s.name
+        }
+
+    async with httpx.AsyncClient(timeout=45.0) as client:
+        if progress_callback:
+            progress_callback("Resolviendo servidor de Discord…", 0, 1)
+
+        guild_id, guild_name = await resolve_guild(client, invite_or_guild, headers)
+        if not guild_id:
+            raise ValueError(f"No se pudo resolver el servidor de Discord desde: {invite_or_guild}")
+
+        if progress_callback:
+            progress_callback(f"Conectado a «{guild_name}» ({guild_id})…", 0, 1)
+
+        # 1. Obtener canales
+        r = await client.get(f"{BASE_URL}/guilds/{guild_id}/channels", headers=headers)
+        if r.status_code == 401:
+            raise ValueError("Token de Discord inválido o expirado.")
+        if not r.is_success:
+            raise RuntimeError(f"Error al acceder a canales ({r.status_code}): {r.text}")
+
+        channels = r.json()
+        parent_map = {c["id"]: c["name"] for c in channels if c.get("type") == 4}
+
+        # Canales de texto, anuncios o foros
+        schematic_channels = [
+            (parent_map.get(c.get("parent_id"), ""), c)
+            for c in channels
+            if c.get("type") in (0, 5, 15)
+        ]
+
+        total_channels = len(schematic_channels)
+        total_downloaded = 0
+        total_skipped = 0
+
+        temp_dir = STORAGE_DIR / "temp_sync"
+        temp_dir.mkdir(parents=True, exist_ok=True)
+
+        for ch_idx, (pname, ch) in enumerate(schematic_channels, 1):
+            ch_id = ch["id"]
+            ch_name = ch.get("name", "")
+            ch_type = ch.get("type")
+
+            if progress_callback:
+                progress_callback(f"[{ch_idx}/{total_channels}] #{ch_name} ({pname or 'General'})", ch_idx, total_channels)
+
+            # Asignar o crear categoría dinámicamente
+            cat_id = None
+            with get_session() as session:
+                cat_id = ensure_category_hierarchy(session, pname, ch_name)
+
+            threads_to_process = []
+            if ch_type == 15:
+                offset = 0
+                while True:
+                    r_th = await client.get(f"{BASE_URL}/channels/{ch_id}/threads/search?limit=25&offset={offset}", headers=headers)
+                    if not r_th.is_success:
+                        break
+                    th_data = r_th.json()
+                    thread_list = th_data.get("threads", [])
+                    if not thread_list:
+                        break
+                    threads_to_process.extend(thread_list)
+                    if not th_data.get("has_more", False) or len(thread_list) < 25:
+                        break
+                    offset += 25
+            else:
+                threads_to_process = [{"id": ch_id, "name": ch_name}]
+
+            for t in threads_to_process:
+                t_id = t.get("id")
+                t_name = t.get("name", ch_name)
+
+                r_msg = await client.get(f"{BASE_URL}/channels/{t_id}/messages?limit=50", headers=headers)
+                if not r_msg.is_success:
+                    continue
+
+                messages = r_msg.json()
+                if not isinstance(messages, list):
+                    continue
+
+                for msg in messages:
+                    content = msg.get("content", "")
+                    attachments = msg.get("attachments", [])
+
+                    schematic_urls: List[Tuple[str, str]] = []
+
+                    for att in attachments:
+                        fn = att.get("filename", "")
+                        url = att.get("url", "")
+                        if fn.lower().endswith(".litematic"):
+                            schematic_urls.append((fn, url))
+
+                    for url in re.findall(r"https?://[^\s\)\>\]]+\.litematic", content):
+                        parsed = urllib.parse.urlparse(url)
+                        fn = Path(parsed.path).name
+                        if fn and fn.lower().endswith(".litematic"):
+                            schematic_urls.append((fn, url))
+
+                    for fn, url in schematic_urls:
+                        clean_name = Path(fn).stem
+                        clean_name = re.sub(r'[\\/*?:"<>|]', "", clean_name).strip()
+                        if not clean_name:
+                            clean_name = f"schematic_{int(time.time())}"
+
+                        # Comprobación O(1) instantánea en memoria sin descargar nada
+                        if clean_name.lower() in existing_names:
+                            total_skipped += 1
+                            continue
+
+                        tmp_file = temp_dir / f"{clean_name}.litematic"
+
+                        try:
+                            if progress_callback:
+                                progress_callback(f"Descargando: {clean_name}…", ch_idx, total_channels)
+
+                            r_dl = await client.get(url)
+                            if r_dl.status_code == 200 and len(r_dl.content) > 0:
+                                with open(tmp_file, "wb") as f_out:
+                                    f_out.write(r_dl.content)
+
+                                tags_to_apply = detect_tags(f"{t_name} {content}", clean_name, tag_map)
+
+                                schem = file_service.import_schematic(
+                                    src_path=tmp_file,
+                                    name=clean_name,
+                                    category_id=cat_id,
+                                )
+
+                                with get_session() as session:
+                                    db_s = session.get(Schematic, schem.id)
+                                    if db_s:
+                                        if content:
+                                            db_s.description = f"[{t_name}]\n{content[:400]}"
+                                            session.add(db_s)
+                                        for tid in tags_to_apply:
+                                            session.add(SchematicTagLink(schematic_id=schem.id, tag_id=tid))
+                                        session.commit()
+
+                                total_downloaded += 1
+                                existing_names.add(clean_name.lower())
+                        except Exception as exc:
+                            logger.warning("Error con %s: %s", clean_name, exc)
+                        finally:
+                            if tmp_file.exists():
+                                try:
+                                    tmp_file.unlink()
+                                except Exception:
+                                    pass
+
+        cfg["last_sync"] = int(time.time())
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2, ensure_ascii=False)
+
+        resumen = f"Sincronización completada de «{guild_name}»: {total_downloaded} nuevas litemáticas añadidas ({total_skipped} omitidas)."
+        if progress_callback:
+            progress_callback(resumen, total_channels, total_channels)
+
+        return total_downloaded, total_skipped, resumen

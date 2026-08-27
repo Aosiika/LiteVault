@@ -1,0 +1,17 @@
+{
+  "name": "litevault-viewer",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "schematic-renderer": "^1.6.1",
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "vite": "^5.2.0",
+    "vite-plugin-wasm": "^3.3.0",
+    "vite-plugin-top-level-await": "^1.4.1"
+  }
+}
