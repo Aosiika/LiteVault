@@ -28,8 +28,12 @@ class Sidebar:
     def __init__(
         self,
         on_filter_change: Callable[[Optional[int], list[int]], None],
+        active_tab: str = "collection",
+        on_sync_request: Optional[Callable[[], None]] = None,
     ):
         self._on_filter_change = on_filter_change
+        self._active_tab = active_tab
+        self._on_sync_request = on_sync_request
         self._selected_category: Optional[int] = None
         self._selected_tags: set[int] = set()
         self._expanded_categories: set[int] = set()
@@ -46,21 +50,39 @@ class Sidebar:
     # Build ──────────────────────────────────────────────────────────────
 
     def _build(self) -> None:
-        with ui.column().classes("sidebar"):
-            # Botón "Todas las litemáticas"
-            is_all_active = self._selected_category is None and not self._selected_tags
-            with ui.row().classes("w-full"):
+        from app.i18n import _t, set_language, get_language
+        
+        with ui.column().classes("sidebar relative"):
+            # Brand Logo
+            with ui.row().classes("nav-brand items-center gap-2 mb-4 w-full cursor-pointer").on("click", lambda: ui.navigate.to("/")):
+                ui.icon("diamond", size="1.8rem").classes("nav-brand-icon")
+                ui.html('<div class="nav-brand-title" style="font-size: 1.3rem;">Lite<span>Vault</span></div>')
+
+            # Main Navigation
+            with ui.column().classes("w-full gap-1 mb-2"):
                 ui.button(
-                    "Todas las litemáticas",
+                    _t("sidebar.all_schematics", default="Colección"),
                     icon="grid_view",
-                    on_click=self._clear_filters,
-                ).classes(f"w-full justify-start {'btn-primary' if is_all_active else 'btn-secondary'}").style("font-size:0.85rem;")
+                    on_click=lambda: ui.navigate.to("/") if self._active_tab != "collection" else self._clear_filters(),
+                ).classes(f"w-full justify-start {'btn-primary' if self._active_tab == 'collection' else 'btn-secondary'}").style("font-size:0.85rem;")
+
+                ui.button(
+                    _t("sidebar.categories"),
+                    icon="folder",
+                    on_click=lambda: ui.navigate.to("/categories"),
+                ).classes(f"w-full justify-start {'btn-primary' if self._active_tab == 'categories' else 'btn-secondary'}").style("font-size:0.85rem;")
+
+                ui.button(
+                    _t("sidebar.tags"),
+                    icon="label",
+                    on_click=lambda: ui.navigate.to("/tags"),
+                ).classes(f"w-full justify-start {'btn-primary' if self._active_tab == 'tags' else 'btn-secondary'}").style("font-size:0.85rem;")
 
             ui.separator().style("border-color: var(--border); margin: 6px 0;")
 
             # Encabezado Categorías
             with ui.row().classes("items-center justify-between w-full px-2"):
-                ui.label("CATEGORÍAS").classes("sidebar-section-title")
+                ui.label(_t("sidebar.categories")).classes("sidebar-section-title")
                 with ui.row().classes("items-center gap-1"):
                     ui.button(
                         icon="unfold_more",
@@ -78,7 +100,7 @@ class Sidebar:
 
             # Encabezado Tags
             with ui.row().classes("items-center justify-between w-full px-2"):
-                ui.label("TAGS").classes("sidebar-section-title")
+                ui.label(_t("sidebar.tags")).classes("sidebar-section-title")
                 ui.button(
                     icon="edit",
                     on_click=lambda: ui.navigate.to("/tags"),
@@ -86,6 +108,36 @@ class Sidebar:
 
             self._tags_container = ui.row().classes("flex-wrap gap-1.5 px-1")
             self._render_tags()
+            
+            ui.space()
+            
+            # Selector de Idioma y Ajustes (Footer del Sidebar)
+            with ui.column().classes("w-full gap-2 px-2 py-3 mt-4 border-t border-[var(--border)]"):
+                # Botón de Sincronizar
+                ui.button(
+                    _t("home.sync_button", default="Sincronizar Discord"),
+                    icon="cloud_sync",
+                    on_click=lambda: self._on_sync_request() if self._on_sync_request else None,
+                ).classes("btn-secondary w-full justify-start").style("font-size: 0.8rem;").tooltip("Buscar y descargar nuevas litemáticas")
+
+                # Botón de Ajustes
+                ui.button(
+                    _t("settings.title", default="Ajustes"),
+                    icon="settings",
+                    on_click=lambda: ui.navigate.to("/settings"),
+                ).classes("btn-secondary w-full justify-start").style("font-size: 0.8rem;")
+                
+                with ui.row().classes("w-full items-center justify-between mt-2"):
+                    ui.label(_t("sidebar.language")).style("color: var(--text-secondary); font-size: 0.8rem; font-weight: 600;")
+                    def _change_lang(e):
+                        set_language(e.value)
+                        ui.navigate.reload()
+                    
+                    ui.select(
+                        {"es": "Español", "en": "English"},
+                        value=get_language(),
+                        on_change=_change_lang
+                    ).props("dense outlined borderless").style("width: 100px; font-size: 0.8rem; background: transparent;")
 
     # Categorías ─────────────────────────────────────────────────────────
 
@@ -109,7 +161,8 @@ class Sidebar:
                 roots = children_map.get(None, [])
 
                 if not roots:
-                    ui.label("Sin categorías").style("color:var(--text-muted); font-size:0.78rem; padding: 4px 10px;")
+                    from app.i18n import _t
+                    ui.label(_t("sidebar.no_categories")).style("color:var(--text-muted); font-size:0.78rem; padding: 4px 10px;")
 
                 for cat in roots:
                     self._render_category_node(cat, children_map, counts_map, indent=0)
@@ -158,11 +211,48 @@ class Sidebar:
 
             if count > 0:
                 ui.badge(str(count)).classes("count-badge").style("font-size:0.65rem; padding:1px 6px; flex-shrink: 0;")
+                
+            # Botón de eliminar (sólo para categorías principales)
+            if indent == 0:
+                ui.button(
+                    icon="delete_outline", 
+                    on_click=lambda _c=cat: self._confirm_delete_category(_c)
+                ).props("flat round dense size=xs").classes("text-[var(--danger)] hover:bg-[rgba(239,68,68,0.1)] transition-all").tooltip(f"Eliminar {cat.name}").style("flex-shrink: 0; margin-left: 4px; opacity: 0.7;")
 
         # Renderizar hijos sólo si está expandido
-        if children and is_expanded:
+        if is_expanded:
             for child in children:
                 self._render_category_node(child, children_map, counts_map, indent + 1)
+
+    def _confirm_delete_category(self, cat: Category) -> None:
+        from app.i18n import _t
+        with ui.dialog() as dialog, ui.card().classes("p-6 w-[450px] backdrop-blur-md bg-opacity-70").style("background: rgba(30, 30, 40, 0.7); border: 1px solid rgba(255,255,255,0.1);"):
+            with ui.row().classes("items-center gap-2 mb-2"):
+                ui.icon("warning", size="1.5rem").style("color: var(--danger)")
+                ui.label(_t("sidebar.delete_category_title", name=cat.name)).style("font-size: 1.1rem; font-weight: 700; color: var(--danger);")
+            
+            ui.label(_t("sidebar.delete_category_confirm")).style("color: var(--text-primary); font-weight: 600; margin-bottom: 8px;")
+            ui.label(_t("sidebar.delete_category_warning")).style("color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;")
+            
+            with ui.row().classes("w-full justify-end gap-3 mt-4"):
+                ui.button(_t("sidebar.cancel"), on_click=dialog.close).classes("btn-secondary")
+                
+                def _do_del():
+                    from app.services.file_service import delete_category_hierarchy
+                    dialog.close()
+                    try:
+                        delete_category_hierarchy(cat.id)
+                        ui.notify(_t("sidebar.category_deleted", name=cat.name), color="positive", icon="check_circle")
+                        # Limpiar selección si estábamos dentro
+                        if self._selected_category == cat.id:
+                            self._selected_category = None
+                            self._on_filter_change(None, list(self._selected_tags))
+                        self.refresh()
+                    except Exception as e:
+                        ui.notify(_t("sidebar.delete_error", error=e), color="negative", icon="error")
+                        
+                ui.button(_t("sidebar.yes_delete_all"), on_click=_do_del).classes("btn-primary").style("background: var(--danger) !important; color: white !important;")
+        dialog.open()
 
     def _toggle_expand(self, category_id: int) -> None:
         if category_id in self._expanded_categories:
@@ -200,7 +290,8 @@ class Sidebar:
                 tags = session.exec(select(Tag).order_by(Tag.name)).all()
 
             if not tags:
-                ui.label("Sin tags").style("color:var(--text-muted); font-size:0.78rem; padding: 4px 8px;")
+                from app.i18n import _t
+                ui.label(_t("sidebar.no_tags")).style("color:var(--text-muted); font-size:0.78rem; padding: 4px 8px;")
                 return
 
             for tag in tags:
@@ -265,3 +356,9 @@ class Sidebar:
 
     def _emit(self) -> None:
         self._on_filter_change(self._selected_category, list(self._selected_tags))
+
+    def refresh(self) -> None:
+        """Fuerza la recarga visual de la barra lateral tras cambios en DB."""
+        self._init_expanded()
+        self._render_categories()
+        self._render_tags()

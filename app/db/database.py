@@ -32,8 +32,19 @@ def create_db_and_tables() -> None:
     """Crea todas las tablas si no existen. Llamar al arrancar main.py."""
     # Import de modelos aquí para registrarlos en el metadata de SQLModel
     from app.db import models  # noqa: F401
+    from sqlmodel import text
+    import sqlite3
 
     SQLModel.metadata.create_all(engine)
+    
+    # Migración manual segura: añadir minecraft_version si no existe
+    with engine.begin() as conn:
+        try:
+            conn.execute(text("ALTER TABLE schematic ADD COLUMN minecraft_version VARCHAR"))
+        except Exception as e:
+            # Si el error contiene 'duplicate column name', es normal. Lo ignoramos.
+            pass
+
     print(f"[DB] Base de datos lista en: {DB_PATH}")
 
 

@@ -150,6 +150,7 @@ class Schematic(SQLModel, table=True):
     file_path: str = Field(description="Ruta absoluta al archivo .litematic en storage/")
     category_id: Optional[int] = Field(default=None, foreign_key="category.id")
     thumbnail_path: Optional[str] = Field(default=None)
+    minecraft_version: Optional[str] = Field(default=None, description="Versión de MC (ej. 1.16)")
     block_count: Optional[int] = Field(default=None)
     dimensions: Optional[str] = Field(
         default=None,
@@ -173,6 +174,7 @@ class SchematicCreate(SQLModel):
     thumbnail_path: Optional[str] = None
     block_count: Optional[int] = None
     dimensions: Optional[str] = None
+    minecraft_version: Optional[str] = None
 
 
 class SchematicRead(SQLModel):
@@ -184,6 +186,7 @@ class SchematicRead(SQLModel):
     thumbnail_path: Optional[str] = None
     block_count: Optional[int] = None
     dimensions: Optional[str] = None
+    minecraft_version: Optional[str] = None
     created_at: datetime
     tags: List[TagRead] = []
     category: Optional[CategoryRead] = None

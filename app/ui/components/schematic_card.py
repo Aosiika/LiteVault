@@ -42,10 +42,11 @@ class SchematicCard:
         self._build()
 
     def _build(self) -> None:
+        from app.i18n import _t
         s = self.schematic
 
         with ui.card().classes(
-            f"schematic-card {'schematic-card-selected' if self._selected else ''}"
+            f"schematic-card {'schematic-card-selected' if self._selected else ''} hover-float glass-panel"
         ) as card:
             self._card = card
 
@@ -59,10 +60,10 @@ class SchematicCard:
                 )
                 (
                     ui.button(icon="delete", on_click=self._handle_delete)
-                    .classes("card-delete-btn")
+                    .classes("card-delete-btn hover:scale-110 transition-transform")
                     .props("flat round dense size=sm")
                     .on("click.stop", lambda: None)
-                    .tooltip("Eliminar")
+                    .tooltip(_t("card.delete"))
                 )
 
             # Cuerpo de la tarjeta (click → detalle) ───────────────────────
@@ -88,7 +89,12 @@ class SchematicCard:
                         if s.block_count is not None:
                             with ui.element("div").classes("card-meta-pill"):
                                 ui.icon("view_in_ar", size="0.8rem").style("color: var(--accent)")
-                                ui.label(f"{s.block_count:,} bloques")
+                                ui.label(f"{s.block_count:,} {_t('card.blocks')}")
+                                
+                        if getattr(s, "minecraft_version", None):
+                            with ui.element("div").classes("card-meta-pill").style("background: rgba(230,150,30,0.1); border-color: rgba(230,150,30,0.3);"):
+                                ui.icon("extension", size="0.8rem").style("color: #e6961e;")
+                                ui.label(s.minecraft_version).style("color: #e6961e; font-weight: 600;")
 
                     tags = getattr(s, "_cached_tags", None)
                     if tags is None:

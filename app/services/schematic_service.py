@@ -33,18 +33,49 @@ class SchematicMeta:
         region_count: int = 1,
         author: Optional[str] = None,
         description: Optional[str] = None,
+        minecraft_version: Optional[str] = None,
     ):
         self.dimensions = dimensions       # "XxYxZ"
         self.block_count = block_count
         self.region_count = region_count
         self.author = author
         self.description = description
+        self.minecraft_version = minecraft_version
 
     def __repr__(self) -> str:  # noqa: D105
         return (
             f"SchematicMeta(dims={self.dimensions!r}, "
-            f"blocks={self.block_count}, regions={self.region_count})"
+            f"blocks={self.block_count}, regions={self.region_count}, "
+            f"version={self.minecraft_version})"
         )
+
+# ---------------------------------------------------------------------------
+# Extracción manual de DataVersion con nbtlib
+# ---------------------------------------------------------------------------
+
+DATA_VERSIONS = [
+    (3955, "1.21.1"), (3953, "1.21"), (3839, "1.20.6"), (3798, "1.20.4"), 
+    (3465, "1.20.1"), (3337, "1.19.4"), (3120, "1.19"), (2975, "1.18.2"), 
+    (2860, "1.18"), (2730, "1.17.1"), (2586, "1.16.5"), (2566, "1.16"),
+    (2230, "1.15.2"), (1976, "1.14.4"), (1628, "1.13.2"), (1343, "1.12.2"),
+    (1139, "1.12")
+]
+
+def get_minecraft_version(filepath: str) -> str:
+    """Lee el NBT comprimido y extrae la versión de Minecraft."""
+    try:
+        import nbtlib
+        nbt_file = nbtlib.load(filepath)
+        version_tag = nbt_file.get("MinecraftDataVersion")
+        if version_tag is not None:
+            dv = int(version_tag)
+            for version_id, name in DATA_VERSIONS:
+                if dv >= version_id:
+                    return name
+    except Exception as e:
+        logger.debug("No se pudo extraer MinecraftDataVersion de %s: %s", filepath, e)
+    return "1.12"
+
 
 
 # ---------------------------------------------------------------------------
@@ -189,16 +220,19 @@ def read_metadata(filepath: str | Path) -> SchematicMeta:
         SchematicMeta con dimensiones y block_count.
     """
     path = str(filepath)
+    mc_version = get_minecraft_version(path)
 
     meta = _extract_via_nucleation(path)
     if meta is not None:
+        meta.minecraft_version = mc_version
         logger.info("Metadata leída con nucleation: %s", meta)
         return meta
 
     meta = _extract_via_litemapy(path)
     if meta is not None:
+        meta.minecraft_version = mc_version
         logger.info("Metadata leída con litemapy: %s", meta)
         return meta
 
     logger.warning("No se pudo extraer metadata de %s — usando valores por defecto", path)
-    return SchematicMeta(dimensions="?x?x?", block_count=0)
+    return SchematicMeta(dimensions="?x?x?", block_count=0, minecraft_version=mc_version)

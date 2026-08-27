@@ -20,26 +20,31 @@ class CategoriesPage:
         self._build()
 
     def _build(self) -> None:
-        with ui.column().classes("main-content-scroll w-full gap-5 p-6"):
-            # Header
-            with ui.row().classes("items-center justify-between w-full pb-3 border-b border-[var(--border)]"):
-                with ui.row().classes("items-center gap-3"):
+        from app.ui.components.sidebar import Sidebar
+        from app.i18n import _t
+        
+        with ui.element("div").classes("app-layout"):
+            Sidebar(
+                on_filter_change=lambda c, t: ui.navigate.to("/"),
+                active_tab="categories"
+            )
+            
+            with ui.column().classes("main-content-scroll w-full gap-5 p-6"):
+                # Header
+                with ui.row().classes("items-center justify-between w-full pb-3 border-b border-[var(--border)]"):
+                    with ui.row().classes("items-center gap-3"):
+                        ui.icon("folder", size="1.6rem").style("color: var(--accent)")
+                        ui.label(_t("sidebar.categories", default="Gestión de Categorías")).classes("page-title")
+
                     ui.button(
-                        icon="arrow_back",
-                        on_click=lambda: ui.navigate.to("/"),
-                    ).classes("btn-secondary")
-                    ui.icon("folder", size="1.6rem").style("color: var(--accent)")
-                    ui.label("Gestión de Categorías").classes("page-title")
+                        "Nueva categoría",
+                        icon="add",
+                        on_click=lambda: self._open_create_dialog(parent_id=None),
+                    ).classes("btn-primary")
 
-                ui.button(
-                    "Nueva categoría",
-                    icon="add",
-                    on_click=lambda: self._open_create_dialog(parent_id=None),
-                ).classes("btn-primary")
-
-            # Árbol de categorías
-            self._tree_container = ui.column().classes("w-full gap-2")
-            self._render_tree()
+                # Árbol de categorías
+                self._tree_container = ui.column().classes("w-full gap-2")
+                self._render_tree()
 
     # Árbol ───────────────────────────────────────────────────────────────
 

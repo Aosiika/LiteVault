@@ -48,8 +48,31 @@ app.add_static_files("/textures", str(Path(__file__).parent / "static" / "textur
 # CSS Global (Estética Minecraft & Modrinth) ──────────────────────────────
 
 GLOBAL_CSS = f"""
-/* ─── Google Fonts Modernas ─── */
+/* ─── Google Fonts Modernas e Iconos ─── */
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
+
+/* ─── Forzar uso de Material Symbols Rounded ─── */
+.q-icon, .material-icons {{
+  font-family: 'Material Symbols Rounded' !important;
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}}
+
+/* ─── Utilidades Generales ─── */
+.glass-panel {{
+  background: rgba(30, 31, 38, 0.45) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}}
+.hover-float {{
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}}
+.hover-float:hover {{
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: var(--shadow-hover);
+}}
 
 /* ─── Variables de Diseño ─── */
 :root {{
@@ -254,6 +277,8 @@ html, body {{
 }}
 .main-content {{
   flex: 1;
+  min-width: 0;
+  width: 100%;
   padding: 20px 24px 40px;
   display: flex;
   flex-direction: column;
@@ -308,14 +333,24 @@ html, body {{
 
 /* ─── Grid de Tarjetas ─── */
 .schematics-grid {{
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   width: 100%;
+}}
+.schematics-grid-single-row {{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  width: 100%;
+  max-height: 275px;
+  overflow: hidden;
 }}
 
 /* ─── Tarjeta de Schematic (Estilo Modrinth Project Card) ─── */
 .schematic-card {{
+  flex: 1 1 260px;
+  max-width: 320px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -630,27 +665,21 @@ def page_home():
 @ui.page("/categories")
 def page_categories():
     _inject_css()
-    from app.ui.pages.home import build_navbar
     from app.ui.pages.categories import CategoriesPage
-    build_navbar(active_tab="categories")
     CategoriesPage()
 
 
 @ui.page("/tags")
 def page_tags():
     _inject_css()
-    from app.ui.pages.home import build_navbar
     from app.ui.pages.tags import TagsPage
-    build_navbar(active_tab="tags")
     TagsPage()
 
 
 @ui.page("/settings")
 def page_settings():
     _inject_css()
-    from app.ui.pages.home import build_navbar
     from app.ui.pages.settings import SettingsPage
-    build_navbar(active_tab="settings")
     SettingsPage()
 
 
@@ -735,6 +764,7 @@ def run():
         show=False,               # No abrir navegador del sistema — ventana nativa
         show_welcome_message=False,
         favicon="💎",
+        storage_secret="litevault_secret_123",
     )
 
 

@@ -87,38 +87,35 @@ async def resolve_guild(client: httpx.AsyncClient, invite_or_id: str, headers: d
     return cleaned, "Servidor de Discord"
 
 
-def ensure_category_hierarchy(session, parent_name: Optional[str], channel_name: str) -> Optional[int]:
+def ensure_category_hierarchy(session, path_segments: List[str]) -> Optional[int]:
     """
-    Crea dinámicamente o busca la categoría y subcategoría en LiteVault
-    para ajustarse a cualquier estructura de servidor de Discord.
+    Crea dinámicamente la jerarquía de categorías a partir de una lista de nombres.
+    Devuelve el ID de la categoría final (hoja).
     """
-    parent_cat_id = None
-    if parent_name and parent_name.strip():
-        p_clean = parent_name.strip()
-        parent_cat = session.exec(
-            select(Category).where(Category.parent_id == None, Category.name.ilike(p_clean))
-        ).first()
-        if not parent_cat:
-            parent_cat = Category(name=p_clean, parent_id=None)
-            session.add(parent_cat)
+    parent_id = None
+    for name in path_segments:
+        if not name or not name.strip():
+            continue
+        clean_name = name.strip()
+        
+        # Buscar subcategoría bajo el padre actual
+        query = select(Category).where(Category.name.ilike(clean_name))
+        if parent_id is None:
+            query = query.where(Category.parent_id == None)
+        else:
+            query = query.where(Category.parent_id == parent_id)
+            
+        cat = session.exec(query).first()
+        
+        if not cat:
+            cat = Category(name=clean_name, parent_id=parent_id)
+            session.add(cat)
             session.commit()
-            session.refresh(parent_cat)
-        parent_cat_id = parent_cat.id
-
-    c_clean = channel_name.strip()
-    # Buscar subcategoría bajo este padre
-    query = select(Category).where(Category.name.ilike(c_clean))
-    if parent_cat_id is not None:
-        query = query.where(Category.parent_id == parent_cat_id)
-    cat = session.exec(query).first()
-
-    if not cat:
-        cat = Category(name=c_clean, parent_id=parent_cat_id)
-        session.add(cat)
-        session.commit()
-        session.refresh(cat)
-
-    return cat.id
+            session.refresh(cat)
+            
+        parent_id = cat.id
+        
+    return parent_id
 
 
 def build_tag_lookup() -> Dict[str, int]:
@@ -203,9 +200,9 @@ async def sync_discord_async(
     # Cargar nombres existentes en memoria para comprobación O(1) instantánea
     with get_session() as session:
         existing_names: Set[str] = {
-            s.name.lower().strip()
+            s.lower().strip()
             for s in session.exec(select(Schematic.name)).all()
-            if s.name
+            if s
         }
 
     async with httpx.AsyncClient(timeout=45.0) as client:
@@ -251,32 +248,35 @@ async def sync_discord_async(
             if progress_callback:
                 progress_callback(f"[{ch_idx}/{total_channels}] #{ch_name} ({pname or 'General'})", ch_idx, total_channels)
 
-            # Asignar o crear categoría dinámicamente
-            cat_id = None
-            with get_session() as session:
-                cat_id = ensure_category_hierarchy(session, pname, ch_name)
-
             threads_to_process = []
             if ch_type == 15:
-                offset = 0
-                while True:
-                    r_th = await client.get(f"{BASE_URL}/channels/{ch_id}/threads/search?limit=25&offset={offset}", headers=headers)
-                    if not r_th.is_success:
-                        break
-                    th_data = r_th.json()
-                    thread_list = th_data.get("threads", [])
-                    if not thread_list:
-                        break
-                    threads_to_process.extend(thread_list)
-                    if not th_data.get("has_more", False) or len(thread_list) < 25:
-                        break
-                    offset += 25
+                # 1. Obtener hilos activos del servidor y filtrar por este canal
+                r_active = await client.get(f"{BASE_URL}/guilds/{guild_id}/threads/active", headers=headers)
+                if r_active.is_success:
+                    active_th = r_active.json().get("threads", [])
+                    threads_to_process.extend([t for t in active_th if t.get("parent_id") == ch_id])
+                
+                # 2. Obtener hilos archivados de este canal (foro)
+                r_arch = await client.get(f"{BASE_URL}/channels/{ch_id}/threads/archived/public?limit=50", headers=headers)
+                if r_arch.is_success:
+                    threads_to_process.extend(r_arch.json().get("threads", []))
             else:
                 threads_to_process = [{"id": ch_id, "name": ch_name}]
 
             for t in threads_to_process:
                 t_id = t.get("id")
                 t_name = t.get("name", ch_name)
+
+                # Construir la jerarquía completa: Server -> Parent -> Channel -> Thread
+                path_segments = [guild_name]
+                if pname:
+                    path_segments.append(pname)
+                
+                if ch_type == 15 and t_name != ch_name:
+                    path_segments.append(ch_name)
+                    path_segments.append(t_name)
+                else:
+                    path_segments.append(ch_name)
 
                 r_msg = await client.get(f"{BASE_URL}/channels/{t_id}/messages?limit=50", headers=headers)
                 if not r_msg.is_success:
@@ -323,6 +323,11 @@ async def sync_discord_async(
 
                             r_dl = await client.get(url)
                             if r_dl.status_code == 200 and len(r_dl.content) > 0:
+                                # Garantizamos la jerarquía de categorías SOLO si descargamos algo con éxito
+                                cat_id = None
+                                with get_session() as session:
+                                    cat_id = ensure_category_hierarchy(session, path_segments)
+
                                 with open(tmp_file, "wb") as f_out:
                                     f_out.write(r_dl.content)
 

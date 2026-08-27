@@ -22,136 +22,94 @@ from app.ui.components.viewer_webview import open_viewer_dialog
 def open_discord_sync_dialog(on_completed: Optional[callable] = None) -> None:
     """Diálogo modal interactivo para sincronizar con cualquier servidor de Discord."""
     from app.services.discord_sync_service import load_discord_config, save_discord_config, sync_discord_async
+    from app.i18n import _t
 
     cfg = load_discord_config()
     cur_token = cfg.get("token") or ""
     cur_invite = cfg.get("invite_or_guild") or "https://discord.gg/nkGFgD2YW"
 
-    with ui.dialog() as dialog:
-        dialog.open()
-        with ui.card().classes("dialog-card").style("min-width: 500px; max-width: 650px;"):
-            with ui.row().classes("items-center justify-between w-full mb-2"):
-                with ui.row().classes("items-center gap-2"):
-                    ui.icon("cloud_sync", size="1.5rem").style("color: var(--accent)")
-                    ui.label("Sincronizador Universal de Discord").classes("dialog-title").style("margin:0")
-                close_btn = ui.button(icon="close", on_click=dialog.close).classes("btn-ghost-icon")
+    with ui.dialog() as dialog, ui.card().classes(
+        "w-[500px] p-6 glass-panel"
+    ):
+        with ui.row().classes("items-center justify-between w-full mb-4"):
+            with ui.row().classes("items-center gap-2"):
+                ui.icon("cloud_download", size="1.5rem").style("color: var(--accent)")
+                ui.label(_t("home.sync_dialog_title")).style("font-size: 1.25rem; font-weight: 700;")
+            close_btn = ui.button(icon="close", on_click=dialog.close).props("flat round dense").classes("text-[var(--text-secondary)] hover:text-white transition-all")
 
-            ui.separator().style("border-color: var(--border); margin-bottom: 12px;")
+        token_input = ui.input(
+            _t("home.sync_token_label"),
+            value=cur_token,
+            placeholder=_t("home.sync_token_placeholder"),
+            password=True,
+            password_toggle_button=True,
+        ).classes("w-full mb-2")
 
-            ui.label(
-                "Introduce tu token y cualquier enlace de invitación de Discord (ej: https://discord.gg/nkGFgD2YW). LiteVault detectará el servidor, creará las categorías y descargará las litemáticas automáticamente."
-            ).style("color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;")
+        invite_input = ui.input(
+            _t("home.sync_invite_label"),
+            value=cur_invite,
+            placeholder=_t("home.sync_invite_placeholder"),
+        ).classes("w-full mb-3")
 
-            token_input = ui.input(
-                "Token de Discord (Authorization)",
-                value=cur_token,
-                password=True,
-                password_toggle_button=True,
-            ).classes("w-full mb-2")
+        status_label = ui.label("Listo para sincronizar.").style("color: var(--text-secondary); font-size: 0.85rem; font-weight: 500;")
+        progress_bar = ui.linear_progress(value=0, show_value=False).classes("w-full my-2").props("stripe animated color=positive")
+        progress_bar.visible = False
 
-            invite_input = ui.input(
-                "Enlace de Invitación o ID del Servidor",
-                value=cur_invite,
-                placeholder="Ej: https://discord.gg/nkGFgD2YW o 1161803566265143306",
-            ).classes("w-full mb-3")
+        with ui.row().classes("items-center justify-end gap-2 w-full mt-4"):
+            cancel_btn = ui.button(_t("home.sync_cancel"), on_click=dialog.close).classes("btn-secondary")
+            sync_btn = ui.button(_t("home.sync_start"), icon="sync").classes("btn-primary")
 
-            status_label = ui.label("Listo para sincronizar.").style("color: var(--text-secondary); font-size: 0.85rem; font-weight: 500;")
-            progress_bar = ui.linear_progress(value=0).classes("w-full my-2").props("stripe animated color=positive")
-            progress_bar.visible = False
+        async def _do_sync():
+            token = token_input.value.strip()
+            invite = invite_input.value.strip()
+            if not token:
+                ui.notify(_t("home.sync_missing_token"), color="negative")
+                return
+            save_discord_config(token, invite)
 
-            with ui.row().classes("items-center justify-end gap-2 w-full mt-4"):
-                cancel_btn = ui.button("Cancelar", on_click=dialog.close).classes("btn-secondary")
-                sync_btn = ui.button("Iniciar Sincronización", icon="sync").classes("btn-primary")
+            dialog.props("persistent")  # Bloquear cierre accidental mientras sincroniza
+            close_btn.disable()
+            cancel_btn.disable()
+            sync_btn.disable()
+            token_input.disable()
+            invite_input.disable()
 
-            async def _do_sync():
-                token = token_input.value.strip()
-                invite = invite_input.value.strip()
-                if not token:
-                    ui.notify("Debes ingresar un token de Discord", color="negative")
-                    return
-                save_discord_config(token, invite)
+            progress_bar.visible = True
+            progress_bar.value = 0.05
+            status_label.text = _t("home.sync_connecting")
 
-                dialog.props("persistent")  # Bloquear cierre accidental mientras sincroniza
-                close_btn.disable()
-                cancel_btn.disable()
-                sync_btn.disable()
-                token_input.disable()
-                invite_input.disable()
-
-                progress_bar.visible = True
-                progress_bar.value = 0.05
-                status_label.text = "Conectando y resolviendo servidor de Discord…"
-
-                def _cb(msg: str, cur: int, tot: int):
+            def _cb(msg: str, cur: int, tot: int):
+                if tot > 0:
+                    pct = (cur / tot) * 100
+                    status_label.text = f"{msg} ({pct:.1f}%)"
+                    progress_bar.value = max(0.05, min(1.0, cur / tot))
+                else:
                     status_label.text = msg
-                    if tot > 0:
-                        progress_bar.value = max(0.05, min(1.0, cur / tot))
 
-                try:
-                    added, skipped, summary = await sync_discord_async(progress_callback=_cb)
-                    progress_bar.value = 1.0
-                    status_label.text = f"✓ {summary}"
-                    ui.notify(f"¡Sincronización finalizada! {added} nuevas litemáticas añadidas.", color="positive", position="bottom-right")
-                    sync_btn.text = "Cerrar"
-                    sync_btn.enable()
-                    sync_btn.on_click(dialog.close)
-                    close_btn.enable()
-                    dialog.props(remove="persistent")
-                    if on_completed:
-                        on_completed()
-                except Exception as err:
-                    status_label.text = f"❌ Error: {err}"
-                    ui.notify(f"Error: {err}", color="negative", position="bottom-right")
-                    sync_btn.enable()
-                    close_btn.enable()
-                    cancel_btn.enable()
-                    token_input.enable()
-                    invite_input.enable()
-                    dialog.props(remove="persistent")
+            try:
+                added, skipped, summary = await sync_discord_async(progress_callback=_cb)
+                progress_bar.value = 1.0
+                status_label.text = f"✓ {summary}"
+                ui.notify(_t("home.sync_finished", added=added), color="positive", position="bottom-right")
+                sync_btn.visible = False
+                cancel_btn.text = _t("home.sync_close")
+                cancel_btn.enable()
+                close_btn.enable()
+                dialog.props(remove="persistent")
+                if on_completed:
+                    on_completed()
+            except Exception as err:
+                status_label.text = _t("home.sync_error", error=err)
+                ui.notify(_t("home.sync_error", error=err), color="negative", position="bottom-right")
+                sync_btn.enable()
+                close_btn.enable()
+                cancel_btn.enable()
+                token_input.enable()
+                invite_input.enable()
+                dialog.props(remove="persistent")
 
-            sync_btn.on_click(_do_sync)
-
-
-def build_navbar(active_tab: str = "collection", on_sync_done: Optional[callable] = None) -> None:
-    """Barra de navegación superior con estética Modrinth / Minecraft."""
-    with ui.header().classes("navbar"):
-        # Logo + Marca ──────────────────────────────────────────────────
-        with ui.row().classes("nav-brand items-center gap-2").on("click", lambda: ui.navigate.to("/")):
-            ui.icon("diamond", size="1.5rem").classes("nav-brand-icon")
-            ui.html('<div class="nav-brand-title">Lite<span>Vault</span></div>')
-
-        # Enlaces centrales ─────────────────────────────────────────────
-        with ui.row().classes("nav-links"):
-            ui.button(
-                "Colección",
-                icon="grid_view",
-                on_click=lambda: ui.navigate.to("/"),
-            ).classes(f"nav-btn {'nav-btn-active' if active_tab == 'collection' else ''}")
-
-            ui.button(
-                "Categorías",
-                icon="folder",
-                on_click=lambda: ui.navigate.to("/categories"),
-            ).classes(f"nav-btn {'nav-btn-active' if active_tab == 'categories' else ''}")
-
-            ui.button(
-                "Tags",
-                icon="label",
-                on_click=lambda: ui.navigate.to("/tags"),
-            ).classes(f"nav-btn {'nav-btn-active' if active_tab == 'tags' else ''}")
-
-        # Acciones a la derecha ─────────────────────────────────────────
-        with ui.row().classes("items-center gap-2"):
-            ui.button(
-                "Sincronizar Discord",
-                icon="cloud_sync",
-                on_click=lambda: open_discord_sync_dialog(on_completed=on_sync_done),
-            ).classes("btn-secondary text-xs").props("dense").tooltip("Buscar y descargar nuevas litemáticas")
-
-            ui.button(
-                icon="settings",
-                on_click=lambda: ui.navigate.to("/settings"),
-            ).classes(f"nav-btn {'nav-btn-active' if active_tab == 'settings' else ''}").tooltip("Configuración y Créditos")
+        sync_btn.on_click(_do_sync)
+    dialog.open()
 
 
 class HomePage:
@@ -170,82 +128,75 @@ class HomePage:
         self._grid_container: Optional[ui.element] = None
         self._pagination_container: Optional[ui.element] = None
         self._sidebar: Optional[Sidebar] = None
-        build_navbar(active_tab="collection", on_sync_done=self._load_schematics)
         self._build()
 
     # Layout principal ────────────────────────────────────────────────────
 
     def _build(self) -> None:
-        with ui.row().classes("app-layout w-full"):
-            self._sidebar = Sidebar(on_filter_change=self._on_filter_change)
+        def _on_sync_done():
+            self._load_schematics()
+            if self._sidebar:
+                self._sidebar.refresh()
 
-            with ui.column().classes("main-content"):
+        with ui.element("div").classes("app-layout"):
+            self._sidebar = Sidebar(
+                on_filter_change=self._on_filter_change,
+                active_tab="collection",
+                on_sync_request=lambda: open_discord_sync_dialog(on_completed=_on_sync_done)
+            )
+
+            with ui.element("div").classes("main-content w-full"):
                 self._build_toolbar()
-                self._build_upload_zone()
-                self._grid_container = ui.element("div").classes("schematics-grid")
+                
+                # Upload invisible para poder usar self._uploader en _build_toolbar
+                with ui.element("div").style("display: none;"):
+                    self._uploader = ui.upload(
+                        multiple=False,
+                        on_upload=self._handle_upload,
+                        auto_upload=True
+                    )
+                
+                self._grid_container = ui.element("div").classes("schematics-grid w-full mt-4")
                 self._pagination_container = ui.row().classes("items-center justify-center gap-3 w-full py-4")
                 self._load_schematics()
                 self._build_fab()
 
-    # Toolbar ─────────────────────────────────────────────────────────────
+    # Toolbar (Top Bar minimalista) ───────────────────────────────────────
 
     def _build_toolbar(self) -> None:
-        with ui.row().classes("toolbar items-center justify-between w-full pb-2 border-b border-[var(--border)] gap-4"):
-            with ui.row().classes("items-center gap-3"):
-                ui.icon("inventory_2", size="1.3rem").style("color: var(--accent)")
-                ui.label("Colección de Litemáticas").classes("page-title")
-                self._count_badge = ui.badge("0").classes("count-badge")
-
-            # Buscador en vivo de alto rendimiento
+        from app.i18n import _t
+        with ui.row().classes("toolbar items-center justify-between w-full pb-4 border-b border-[var(--border)] pt-2"):
+            # Lado izquierdo (vacío o título)
             with ui.row().classes("items-center gap-2"):
+                ui.label(_t("home.title")).classes("page-title").style("font-size: 1.4rem;")
+                self._count_badge = ui.badge("0").classes("count-badge").style("font-size: 0.75rem;")
+
+            # Centro: Buscador
+            with ui.row().classes("items-center flex-1 justify-center"):
                 self._search_input = (
-                    ui.input(placeholder="Buscar por nombre…")
+                    ui.input(
+                        placeholder=_t("home.search_placeholder"),
+                        on_change=lambda e: self._on_search(e.value or "")
+                    )
                     .props("dense outlined rounded clearable")
-                    .classes("w-64")
-                    .style("background: var(--bg-card); font-size: 0.85rem;")
+                    .classes("w-[400px] max-w-[50vw]")
+                    .style("background: var(--bg-card); font-size: 0.9rem;")
                 )
-                self._search_input.on("input", lambda e: self._on_search(e.value or ""))
+                with self._search_input:
+                    ui.icon("search", size="1.2rem").classes("mr-2 text-[var(--text-muted)]")
+
+            # Derecha: Botón importar discreto
+            with ui.row().classes("items-center justify-end gap-2"):
+                ui.button(
+                    _t("home.import_title", default="Importar"),
+                    icon="file_upload",
+                    on_click=self._import_native,
+                ).classes("btn-primary").props("dense").style("font-size: 0.85rem; padding: 4px 16px;")
 
     def _on_search(self, val: str) -> None:
         self._search_query = val.strip().lower()
         self._current_page = 1
         self._load_schematics()
-
-    # Upload zone ─────────────────────────────────────────────────────────
-
-    def _build_upload_zone(self) -> None:
-        """
-        Zona de drag & drop + botón de selección estilo Minecraft Hopper.
-        """
-        with ui.card().classes("upload-zone-wrapper w-full p-0"):
-            with ui.row().classes("upload-zone-label items-center justify-between"):
-                with ui.row().classes("items-center gap-3"):
-                    ui.icon("upload_file", size="1.4rem").style("color: var(--accent)")
-                    with ui.column().classes("gap-0"):
-                        ui.label("Importar archivo .litematic").style(
-                            "font-weight: 700; font-size: 0.9rem; color: var(--text-primary);"
-                        )
-                        ui.label("Arrastra tus archivos aquí o haz clic para explorar").style(
-                            "font-size: 0.78rem; color: var(--text-secondary);"
-                        )
-                ui.button(
-                    "Examinar archivos",
-                    icon="file_open",
-                    on_click=self._import_native,
-                ).classes("btn-secondary")
-
-            # Upload invisible para drag & drop web
-            self._uploader = (
-                ui.upload(
-                    multiple=False,
-                    on_upload=self._handle_upload,
-                    auto_upload=True,
-                )
-                .props('accept=".litematic" flat no-thumbnails')
-                .classes("upload-overlay")
-            )
-
-        ui.separator().style("border-color:var(--border); margin:4px 0")
 
     # Grid de cards con Carga Optimizada ────────────────────────────────────
 
@@ -259,9 +210,15 @@ class HomePage:
             query = select(Schematic)
             
             if self._active_category is not None:
-                # Incluir la categoría activa y todas sus subcategorías
-                subcats = session.exec(select(Category.id).where(Category.parent_id == self._active_category)).all()
-                cat_ids = [self._active_category] + list(subcats)
+                # Incluir la categoría activa y TODAS sus subcategorías recursivamente
+                cat_ids = [self._active_category]
+                to_check = [self._active_category]
+                while to_check:
+                    current = to_check.pop(0)
+                    children = session.exec(select(Category.id).where(Category.parent_id == current)).all()
+                    cat_ids.extend(children)
+                    to_check.extend(children)
+                    
                 query = query.where(Schematic.category_id.in_(cat_ids))
 
             all_schematics = session.exec(query.order_by(Schematic.name)).all()
@@ -370,39 +327,59 @@ class HomePage:
             self._load_schematics()
 
     def _render_empty_state(self) -> None:
+        from app.i18n import _t
         with ui.column().classes("empty-state"):
             ui.icon("inventory_2", size="4rem").style("color: var(--text-muted)")
-            ui.label("No se encontraron litemáticas").classes("empty-title")
-            ui.label("Prueba con otra categoría, etiqueta o término de búsqueda.").classes("empty-subtitle")
+            ui.label(_t("home.empty_title", default="No se encontraron litemáticas")).classes("empty-title")
+            ui.label(_t("home.empty_subtitle", default="Prueba con otra categoría, etiqueta o término de búsqueda.")).classes("empty-subtitle")
 
     def _render_grouped_recent(self, session, all_schematics: list[Schematic]) -> None:
-        """Renderiza las construcciones agrupadas por categoría padre mostrando las más recientes."""
+        """Renderiza las construcciones agrupadas por categoría padre mostrando las más recientes (máximo 50 en total)."""
+        from app.i18n import _t
         all_cats = session.exec(select(Category)).all()
         parent_cats = [c for c in all_cats if c.parent_id is None]
         parent_cats.sort(key=lambda x: x.name)
         
-        cat_to_parent = {c.id: (c.parent_id if c.parent_id else c.id) for c in all_cats}
+        parent_map = {c.id: c.parent_id for c in all_cats}
+        
+        def get_root(cid: int) -> int:
+            curr = cid
+            while parent_map.get(curr) is not None:
+                curr = parent_map[curr]
+            return curr
+            
+        cat_to_root = {c.id: get_root(c.id) for c in all_cats}
         
         groups: dict[int, list[Schematic]] = {p.id: [] for p in parent_cats}
         groups[0] = []
         
         for s in all_schematics:
-            if s.category_id in cat_to_parent:
-                pid = cat_to_parent[s.category_id]
-                if pid in groups:
-                    groups[pid].append(s)
+            if s.category_id in cat_to_root:
+                root_id = cat_to_root[s.category_id]
+                if root_id in groups:
+                    groups[root_id].append(s)
+                else:
+                    groups[0].append(s)
             else:
                 groups[0].append(s)
 
+        total_shown = 0
+        MAX_GLOBAL = 50
+
         with ui.column().classes("w-full gap-8 mt-2"):
             for p in parent_cats:
+                if total_shown >= MAX_GLOBAL:
+                    break
+                    
                 items = groups[p.id]
                 if not items:
                     continue
                 
-                # Ordenar por ID descendente (más recientes primero) y mostrar hasta 12
+                # Mostrar hasta que lleguemos al máximo global, limitando a 12 por categoría
                 items.sort(key=lambda x: x.id, reverse=True)
-                display_items = items[:12]
+                limit = min(12, MAX_GLOBAL - total_shown)
+                display_items = items[:limit]
+                total_shown += len(display_items)
                 
                 with ui.column().classes("w-full gap-3"):
                     with ui.row().classes("items-center justify-between w-full px-2"):
@@ -410,10 +387,9 @@ class HomePage:
                             ui.icon("folder_special", size="1.2rem").style("color: var(--accent)")
                             ui.label(p.name).style("font-size: 1.15rem; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;")
                         
-                        ui.button("Ver todos", on_click=lambda _id=p.id: self._on_filter_change(_id, [])).props("flat dense").style("font-size: 0.8rem; color: var(--accent-light);")
+                        ui.button(_t("home.view_all", default="Ver todos"), on_click=lambda _id=p.id: self._on_filter_change(_id, [])).props("flat dense").style("font-size: 0.8rem; color: var(--accent-light);")
                     
-                    # Mostrar en formato de cuadrícula (Grid) tradicional
-                    with ui.element("div").classes("schematics-grid w-full"):
+                    with ui.element("div").classes("schematics-grid-single-row"):
                         for schem in display_items:
                             card = SchematicCard(
                                 schematic=schem,
@@ -424,15 +400,18 @@ class HomePage:
                             )
                             self._cards[schem.id] = card
 
-            if groups[0]:
+            if groups[0] and total_shown < MAX_GLOBAL:
                 groups[0].sort(key=lambda x: x.id, reverse=True)
-                display_items = groups[0][:12]
+                limit = min(12, MAX_GLOBAL - total_shown)
+                display_items = groups[0][:limit]
+                total_shown += len(display_items)
+                
                 with ui.column().classes("w-full gap-3"):
                     with ui.row().classes("items-center justify-between w-full px-2"):
                         with ui.row().classes("items-center gap-2"):
                             ui.icon("help_outline", size="1.2rem").style("color: var(--text-muted)")
                             ui.label("Sin Categoría").style("font-size: 1.15rem; font-weight: 700; color: var(--text-primary); text-transform: uppercase;")
-                    with ui.element("div").classes("schematics-grid w-full"):
+                    with ui.element("div").classes("schematics-grid-single-row"):
                         for schem in display_items:
                             card = SchematicCard(
                                 schematic=schem,

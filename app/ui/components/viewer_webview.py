@@ -40,7 +40,7 @@ def open_viewer_dialog(schematic: Schematic, refresh_fn: Optional[Callable] = No
         error_msg = str(exc)
 
     with ui.dialog().classes("viewer-dialog") as dialog:
-        with ui.card().classes("viewer-dialog-card").style("min-width: 92vw; height: 88vh; max-width: 1500px; padding: 0; display: flex; flex-direction: column; overflow: hidden;"):
+        with ui.card().classes("viewer-dialog-card glass-panel").style("min-width: 92vw; height: 88vh; max-width: 1500px; padding: 0; display: flex; flex-direction: column; overflow: hidden;"):
 
             # Header ───────────────────────────────────────────────────────
             with ui.row().classes("viewer-header items-center justify-between w-full px-4 py-3 border-b border-[var(--border)]"):

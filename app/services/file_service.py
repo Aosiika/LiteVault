@@ -73,6 +73,7 @@ def import_schematic(
         block_count=meta.block_count,
         dimensions=meta.dimensions,
         description=meta.description,
+        minecraft_version=meta.minecraft_version,
     )
 
     with get_session() as session:
@@ -169,3 +170,33 @@ def delete_schematic(schematic_id: int) -> None:
 
     # Borrar archivos físicos
     delete_schematic_files(file_path, thumb_path)
+
+def delete_category_hierarchy(category_id: int) -> None:
+    """Elimina recursivamente una categoría, todas sus subcategorías y sus litemáticas (archivos físicos incluidos)."""
+    from app.db.models import Category
+    from sqlmodel import select
+    
+    with get_session() as session:
+        cat_ids = [category_id]
+        to_check = [category_id]
+        while to_check:
+            current = to_check.pop(0)
+            children = session.exec(select(Category.id).where(Category.parent_id == current)).all()
+            cat_ids.extend(children)
+            to_check.extend(children)
+            
+        schematics = session.exec(select(Schematic.id).where(Schematic.category_id.in_(cat_ids))).all()
+        
+    for s_id in schematics:
+        try:
+            delete_schematic(s_id)
+        except Exception as e:
+            logger.warning(f"Error borrando schematic {s_id}: {e}")
+            
+    with get_session() as session:
+        for cid in reversed(cat_ids):
+            c = session.get(Category, cid)
+            if c:
+                session.delete(c)
+        session.commit()
+
