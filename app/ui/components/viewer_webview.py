@@ -150,6 +150,13 @@ def _render_meta(schematic: Schematic, dialog, refresh_fn: Optional[Callable] = 
             ui.label("Bloques").classes("meta-label")
         ui.label(f"{schematic.block_count:,}" if schematic.block_count else "—").classes("meta-value")
 
+    # Versión de Minecraft
+    with ui.column().classes("gap-1"):
+        with ui.row().classes("items-center gap-2"):
+            ui.icon("extension", size="1rem").style("color: var(--accent)")
+            ui.label("Versión").classes("meta-label")
+        ui.label(schematic.minecraft_version or "—").classes("meta-value")
+
     # Categoría
     with ui.column().classes("gap-1"):
         with ui.row().classes("items-center gap-2"):

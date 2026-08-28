@@ -226,11 +226,11 @@ async def sync_discord_async(
         channels = r.json()
         parent_map = {c["id"]: c["name"] for c in channels if c.get("type") == 4}
 
-        # Canales de texto, anuncios o foros
+        # Canales de texto, anuncios, foros o media
         schematic_channels = [
             (parent_map.get(c.get("parent_id"), ""), c)
             for c in channels
-            if c.get("type") in (0, 5, 15)
+            if c.get("type") in (0, 5, 15, 16)
         ]
 
         total_channels = len(schematic_channels)
@@ -249,17 +249,35 @@ async def sync_discord_async(
                 progress_callback(f"[{ch_idx}/{total_channels}] #{ch_name} ({pname or 'General'})", ch_idx, total_channels)
 
             threads_to_process = []
-            if ch_type == 15:
+            if ch_type in (15, 16):
                 # 1. Obtener hilos activos del servidor y filtrar por este canal
                 r_active = await client.get(f"{BASE_URL}/guilds/{guild_id}/threads/active", headers=headers)
                 if r_active.is_success:
                     active_th = r_active.json().get("threads", [])
                     threads_to_process.extend([t for t in active_th if t.get("parent_id") == ch_id])
                 
-                # 2. Obtener hilos archivados de este canal (foro)
-                r_arch = await client.get(f"{BASE_URL}/channels/{ch_id}/threads/archived/public?limit=50", headers=headers)
-                if r_arch.is_success:
-                    threads_to_process.extend(r_arch.json().get("threads", []))
+                # 2. Obtener hilos archivados de este canal (foro/media)
+                before_date = None
+                while True:
+                    url = f"{BASE_URL}/channels/{ch_id}/threads/archived/public?limit=100"
+                    if before_date:
+                        url += f"&before={before_date}"
+                    
+                    r_arch = await client.get(url, headers=headers)
+                    if not r_arch.is_success:
+                        break
+                    
+                    arch_data = r_arch.json()
+                    th_list = arch_data.get("threads", [])
+                    threads_to_process.extend(th_list)
+                    
+                    if not arch_data.get("has_more") or not th_list:
+                        break
+                    
+                    meta = th_list[-1].get("thread_metadata", {})
+                    before_date = meta.get("archive_timestamp")
+                    if not before_date:
+                        break
             else:
                 threads_to_process = [{"id": ch_id, "name": ch_name}]
 
@@ -272,13 +290,20 @@ async def sync_discord_async(
                 if pname:
                     path_segments.append(pname)
                 
-                if ch_type == 15 and t_name != ch_name:
+                if ch_type in (15, 16) and t_name != ch_name:
                     path_segments.append(ch_name)
                     path_segments.append(t_name)
                 else:
                     path_segments.append(ch_name)
 
-                r_msg = await client.get(f"{BASE_URL}/channels/{t_id}/messages?limit=50", headers=headers)
+                if ch_type in (15, 16):
+                    # Foros/Media: buscar desde el principio del hilo (post original y primeros comentarios)
+                    url = f"{BASE_URL}/channels/{t_id}/messages?after={int(t_id) - 1}&limit=10"
+                else:
+                    # Canales de texto: buscar los últimos 50 mensajes
+                    url = f"{BASE_URL}/channels/{t_id}/messages?limit=50"
+
+                r_msg = await client.get(url, headers=headers)
                 if not r_msg.is_success:
                     continue
 

@@ -497,7 +497,6 @@ html, body {{
   padding: 20px !important;
 }}
 .viewer-dialog-card {{
-  background: var(--bg-surface) !important;
   border: 1px solid var(--border) !important;
   border-radius: var(--radius-lg) !important;
   width: 92vw !important;
@@ -512,8 +511,8 @@ html, body {{
 }}
 .viewer-header {{
   padding: 14px 20px !important;
-  border-bottom: 1px solid var(--border) !important;
-  background: var(--bg-surface) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  background: rgba(0, 0, 0, 0.2) !important;
   flex-shrink: 0 !important;
 }}
 .viewer-title {{
@@ -536,8 +535,8 @@ html, body {{
   max-width: 340px !important;
   height: 100% !important;
   padding: 20px !important;
-  border-right: 1px solid var(--border) !important;
-  background: var(--bg-base) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+  background: rgba(0, 0, 0, 0.3) !important;
   overflow-y: auto !important;
   flex-shrink: 0 !important;
 }}
