@@ -492,10 +492,19 @@ html, body {{
   color: var(--text-primary) !important;
 }}
 
+/* ─── Search Input Custom ─── */
+.search-input-custom .q-field__control {{
+  background: var(--bg-card) !important;
+  font-size: 0.9rem !important;
+  border-radius: 9999px !important;
+}}
+.search-input-custom .q-field__control:before {{
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}}
+
 /* ─── Diálogo de Detalle & Visor (Modrinth Modal) ─── */
 .viewer-dialog .q-dialog__inner {{
   padding: 20px !important;
-}}
 .viewer-dialog-card {{
   border: 1px solid var(--border) !important;
   border-radius: var(--radius-lg) !important;
@@ -762,7 +771,7 @@ def run():
         reload=False,
         show=False,               # No abrir navegador del sistema — ventana nativa
         show_welcome_message=False,
-        favicon="💎",
+        favicon="logo.ico",
         storage_secret="litevault_secret_123",
     )
 

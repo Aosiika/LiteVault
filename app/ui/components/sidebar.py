@@ -55,7 +55,7 @@ class Sidebar:
         with ui.column().classes("sidebar relative"):
             # Brand Logo
             with ui.row().classes("nav-brand items-center gap-2 mb-4 w-full cursor-pointer").on("click", lambda: ui.navigate.to("/")):
-                ui.icon("diamond", size="1.8rem").classes("nav-brand-icon")
+                ui.image("/favicon.ico").style("width: 2.2rem; height: 2.2rem; object-fit: contain;")
                 ui.html('<div class="nav-brand-title" style="font-size: 1.3rem;">Lite<span>Vault</span></div>')
 
             # Main Navigation

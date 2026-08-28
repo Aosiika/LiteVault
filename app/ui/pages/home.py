@@ -26,7 +26,7 @@ def open_discord_sync_dialog(on_completed: Optional[callable] = None) -> None:
 
     cfg = load_discord_config()
     cur_token = cfg.get("token") or ""
-    cur_invite = cfg.get("invite_or_guild") or "https://discord.gg/nkGFgD2YW"
+    cur_invite = cfg.get("invite_or_guild") or ""
 
     with ui.dialog() as dialog, ui.card().classes(
         "w-[500px] p-6 glass-panel"
@@ -179,11 +179,10 @@ class HomePage:
                         on_change=lambda e: self._on_search(e.value or "")
                     )
                     .props("dense outlined rounded clearable")
-                    .classes("w-[400px] max-w-[50vw]")
-                    .style("background: var(--bg-card); font-size: 0.9rem;")
+                    .classes("w-[400px] max-w-[50vw] search-input-custom")
                 )
-                with self._search_input:
-                    ui.icon("search", size="1.2rem").classes("mr-2 text-[var(--text-muted)]")
+                with self._search_input.add_slot("append"):
+                    ui.icon("search", size="1.2rem").classes("text-[var(--text-muted)] cursor-pointer")
 
             # Derecha: Botón importar discreto
             with ui.row().classes("items-center justify-end gap-2"):
