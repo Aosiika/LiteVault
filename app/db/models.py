@@ -34,7 +34,7 @@ class SchematicTagLink(SQLModel, table=True):
         default=None, foreign_key="schematic.id", primary_key=True
     )
     tag_id: Optional[int] = Field(
-        default=None, foreign_key="tag.id", primary_key=True
+        default=None, foreign_key="tag.id", primary_key=True, index=True
     )
 
 
@@ -85,20 +85,7 @@ class Category(SQLModel, table=True):
     schematics: List["Schematic"] = Relationship(back_populates="category")
 
 
-class CategoryCreate(SQLModel):
-    name: str
-    parent_id: Optional[int] = None
 
-
-class CategoryRead(SQLModel):
-    id: int
-    name: str
-    parent_id: Optional[int] = None
-
-
-class CategoryUpdate(SQLModel):
-    name: Optional[str] = None
-    parent_id: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------
@@ -119,20 +106,7 @@ class Tag(SQLModel, table=True):
     )
 
 
-class TagCreate(SQLModel):
-    name: str
-    color: Optional[str] = "#1bd96a"
 
-
-class TagRead(SQLModel):
-    id: int
-    name: str
-    color: Optional[str] = "#1bd96a"
-
-
-class TagUpdate(SQLModel):
-    name: Optional[str] = None
-    color: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -148,7 +122,7 @@ class Schematic(SQLModel, table=True):
     name: str = Field(index=True, min_length=1, max_length=200)
     description: Optional[str] = Field(default=None)
     file_path: str = Field(description="Ruta absoluta al archivo .litematic en storage/")
-    category_id: Optional[int] = Field(default=None, foreign_key="category.id")
+    category_id: Optional[int] = Field(default=None, foreign_key="category.id", index=True)
     thumbnail_path: Optional[str] = Field(default=None)
     minecraft_version: Optional[str] = Field(default=None, description="Versión de MC (ej. 1.16)")
     block_count: Optional[int] = Field(default=None)
@@ -177,25 +151,4 @@ class SchematicCreate(SQLModel):
     minecraft_version: Optional[str] = None
 
 
-class SchematicRead(SQLModel):
-    id: int
-    name: str
-    description: Optional[str] = None
-    file_path: str
-    category_id: Optional[int] = None
-    thumbnail_path: Optional[str] = None
-    block_count: Optional[int] = None
-    dimensions: Optional[str] = None
-    minecraft_version: Optional[str] = None
-    created_at: datetime
-    tags: List[TagRead] = []
-    category: Optional[CategoryRead] = None
 
-
-class SchematicUpdate(SQLModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    category_id: Optional[int] = None
-    thumbnail_path: Optional[str] = None
-    block_count: Optional[int] = None
-    dimensions: Optional[str] = None

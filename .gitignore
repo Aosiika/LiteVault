@@ -1,27 +1,57 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Environment
+# Entorno Virtual
 .env
 .venv
 env/
 venv/
+ENV/
+env.bak/
+venv.bak/
 
-# Node
-node_modules/
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# Database and Storage (Important to not push litematics/thumbnails/DB)
+# Base de datos y Almacenamiento local (¡MUY IMPORTANTE NO SUBIR ESTO!)
 storage/
-temp_discord_downloads/
 *.db
 *.sqlite3
 
-# IDEs
-.idea/
-.vscode/
+# Compilación de PyInstaller / Inno Setup
+build/
+dist/
+installer/
+*.spec
+*.iss.bak
 
-# OS
+# Node.js (Si hay dependencias de frontend sueltas)
+node_modules/
+package-lock.json
+
+# MacOS
 .DS_Store
-Thumbs.db

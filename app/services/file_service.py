@@ -58,31 +58,56 @@ def import_schematic(
     logger.info("Copiado %s → %s", src.name, dest)
 
     # 2. Extraer metadata
-    meta = schematic_service.read_metadata(dest)
+    try:
+        meta = schematic_service.read_metadata(dest)
 
-    # 3. Generar miniatura 3D real con Nucleation
-    thumb_path = thumbnail_service.generate_thumbnail(dest, dest_filename.replace(".litematic", ""))
+        # 3. Generar miniatura placeholder muy rápido para la interfaz inmediata
+        stem = dest_filename.replace(".litematic", "")
+        thumb_path = thumbnail_service.generate_placeholder(stem)
 
-    # 4. Persistir en DB
-    display_name = name or src.stem
-    schem_data = SchematicCreate(
-        name=display_name,
-        file_path=str(dest),
-        category_id=category_id,
-        thumbnail_path=str(thumb_path) if thumb_path else None,
-        block_count=meta.block_count,
-        dimensions=meta.dimensions,
-        description=meta.description,
-        minecraft_version=meta.minecraft_version,
-    )
+        # 4. Persistir en DB
+        display_name = name or src.stem
+        schem_data = SchematicCreate(
+            name=display_name,
+            file_path=str(dest),
+            category_id=category_id,
+            thumbnail_path=str(thumb_path) if thumb_path else None,
+            block_count=meta.block_count,
+            dimensions=meta.dimensions,
+            description=meta.description,
+            minecraft_version=meta.minecraft_version,
+        )
 
-    with get_session() as session:
-        schem = Schematic.model_validate(schem_data)
-        session.add(schem)
-        session.commit()
-        session.refresh(schem)
-        logger.info("Schematic guardado: id=%d, name=%r", schem.id, schem.name)
-        return schem
+        with get_session() as session:
+            schem = Schematic.model_validate(schem_data)
+            session.add(schem)
+            session.commit()
+            session.refresh(schem)
+            logger.info("Schematic guardado: id=%d, name=%r", schem.id, schem.name)
+            
+            # 5. Lanzar generación del render 3D real en segundo plano
+            import threading
+            def _background_thumbnail(schem_id: int, p_dest: Path, p_stem: str):
+                try:
+                    real_thumb = thumbnail_service.generate_thumbnail(p_dest, p_stem)
+                    if real_thumb and str(real_thumb) != str(thumb_path):
+                        with get_session() as s:
+                            db_s = s.get(Schematic, schem_id)
+                            if db_s:
+                                db_s.thumbnail_path = str(real_thumb)
+                                s.add(db_s)
+                                s.commit()
+                except Exception as e:
+                    logger.error("Error en render 3D de fondo: %s", e)
+
+            threading.Thread(target=_background_thumbnail, args=(schem.id, dest, stem), daemon=True).start()
+
+            return schem
+    except Exception as e:
+        # Limpiar el archivo copiado si falla la lectura de NBT o DB
+        dest.unlink(missing_ok=True)
+        logger.error("Fallo al importar schematic %s: %s", src.name, e)
+        raise e
 
 
 # ---------------------------------------------------------------------------

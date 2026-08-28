@@ -64,31 +64,39 @@ window.initSchemViewer = async function(canvasId, containerId, payload) {
 };
 
 window.setSchemLayerSlice = function(yMin, yMax) {
-    if (currentRenderer && currentRenderer.renderedSchematics.size > 0) {
-        const id = Array.from(currentRenderer.renderedSchematics.keys())[0];
-        // Note: SchematicRenderer bound coordinates are in schematic local space
-        currentRenderer.setRenderingBounds(
-            id,
-            [-1000, yMin, -1000],
-            [1000, yMax, 1000],
-            false
-        );
+    if (currentRenderer) {
+        const schematics = currentRenderer.getLoadedSchematics();
+        if (schematics && schematics.length > 0) {
+            const id = schematics[0];
+            currentRenderer.setRenderingBounds(
+                id,
+                [-1000, yMin, -1000],
+                [1000, yMax, 1000],
+                false
+            );
+            currentRenderer.invalidate();
+        }
     }
 };
 
 window.resetSchemCamera = function() {
-    if (currentRenderer) {
-        const id = Array.from(currentRenderer.renderedSchematics.keys())[0];
-        if (id) {
-            currentRenderer.centerCameraOnSchematic(id);
-        }
+    if (currentRenderer && currentRenderer.cameraManager) {
+        currentRenderer.cameraManager.focusOnSchematics();
     }
 };
 
 window.toggleSchemAutoRotate = function() {
     if (currentRenderer && currentRenderer.controls) {
-        currentRenderer.controls.autoRotate = !currentRenderer.controls.autoRotate;
-        return currentRenderer.controls.autoRotate;
+        let isRotating = false;
+        currentRenderer.controls.forEach(ctrl => {
+            if (ctrl && ctrl.autoRotate !== undefined) {
+                ctrl.autoRotate = !ctrl.autoRotate;
+                isRotating = ctrl.autoRotate;
+            }
+        });
+        currentRenderer.setContinuous("autoRotate", isRotating);
+        currentRenderer.invalidate();
+        return isRotating;
     }
     return false;
 };

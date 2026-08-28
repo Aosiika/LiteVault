@@ -96,12 +96,24 @@ def generate_thumbnail(schematic_path: Path | str, stem: str) -> Optional[Path]:
         except Exception:
             pass
 
-        # Renderizar directamente al archivo PNG de salida
-        nucleation.Renderer.render_to_file_with_pack(schem, rp, cfg, str(out_path))
+        # Renderizar directamente al archivo PNG de salida temporal
+        png_path = THUMBNAILS_DIR / f"{stem}.png"
+        nucleation.Renderer.render_to_file_with_pack(schem, rp, cfg, str(png_path))
 
-        if out_path.exists() and out_path.stat().st_size > 0:
-            logger.info("Miniatura 3D real generada: %s (%d bytes)", out_path, out_path.stat().st_size)
-            return out_path
+        if png_path.exists() and png_path.stat().st_size > 0:
+            # Convertir a WebP para ahorrar espacio y memoria
+            try:
+                from PIL import Image
+                out_path = THUMBNAILS_DIR / f"{stem}.webp"
+                with Image.open(png_path) as img:
+                    img.save(out_path, "WEBP", quality=85)
+                png_path.unlink() # Borrar PNG original
+                
+                logger.info("Miniatura 3D real WebP generada: %s (%d bytes)", out_path, out_path.stat().st_size)
+                return out_path
+            except Exception as e:
+                logger.warning("Fallo al convertir miniatura a WebP: %s", e)
+                return png_path # Devolver PNG si falla la conversión
     except Exception as exc:
         logger.warning("Fallo al generar miniatura 3D con Nucleation (%s), usando placeholder: %s", p_schem.name, exc)
 
@@ -146,8 +158,8 @@ def generate_placeholder(stem: str, label: str = ".litematic") -> Optional[Path]
         tx = (w - (bbox[2] - bbox[0])) // 2
         draw.text((tx, h - 28), label, fill=(180, 180, 200), font=font)
 
-        out_path = THUMBNAILS_DIR / f"{stem}.png"
-        img.save(out_path, "PNG")
+        out_path = THUMBNAILS_DIR / f"{stem}.webp"
+        img.save(out_path, "WEBP", quality=85)
         return out_path
     except Exception as exc:
         logger.error("Error generando placeholder: %s", exc)

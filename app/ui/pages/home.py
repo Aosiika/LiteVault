@@ -91,7 +91,9 @@ def open_discord_sync_dialog(on_completed: Optional[callable] = None) -> None:
                 progress_bar.value = 1.0
                 status_label.text = f"✓ {summary}"
                 ui.notify(_t("home.sync_finished", added=added), color="positive", position="bottom-right")
-                sync_btn.visible = False
+                sync_btn.text = "Volver a Sincronizar"
+                sync_btn.icon = "refresh"
+                sync_btn.enable()
                 cancel_btn.text = _t("home.sync_close")
                 cancel_btn.enable()
                 close_btn.enable()
@@ -138,6 +140,15 @@ class HomePage:
             if self._sidebar:
                 self._sidebar.refresh()
 
+        async def _startup_update_check():
+            from app.services.update_service import check_for_updates
+            from app.ui.components.update_dialog import open_update_dialog
+            has_update, new_version, notes, url = await check_for_updates()
+            if has_update and url:
+                open_update_dialog(new_version, notes, url, is_manual=False)
+
+        ui.timer(2.0, _startup_update_check, once=True)
+
         with ui.element("div").classes("app-layout"):
             self._sidebar = Sidebar(
                 on_filter_change=self._on_filter_change,
@@ -169,7 +180,11 @@ class HomePage:
             # Lado izquierdo (vacío o título)
             with ui.row().classes("items-center gap-2"):
                 ui.label(_t("home.title")).classes("page-title").style("font-size: 1.4rem;")
-                self._count_badge = ui.badge("0").classes("count-badge").style("font-size: 0.75rem;")
+                self._count_badge = ui.label("0").style(
+                    "font-size: 0.9rem; font-weight: 800; padding: 4px 10px; border-radius: 12px; "
+                    "background: rgba(27, 217, 106, 0.15) !important; color: var(--accent-light) !important; "
+                    "border: 1px solid rgba(27, 217, 106, 0.3) !important; display: inline-block; line-height: 1;"
+                )
 
             # Centro: Buscador
             with ui.row().classes("items-center flex-1 justify-center"):
@@ -204,12 +219,14 @@ class HomePage:
         self._pagination_container.clear()
         self._cards.clear()
 
+        from sqlmodel import or_, func
+
         with get_session() as session:
-            # 1. Consulta optimizada de schematics
+            # 1. Construir query base
             query = select(Schematic)
             
+            # 1.1 Filtrar por categoría
             if self._active_category is not None:
-                # Incluir la categoría activa y TODAS sus subcategorías recursivamente
                 cat_ids = [self._active_category]
                 to_check = [self._active_category]
                 while to_check:
@@ -217,57 +234,38 @@ class HomePage:
                     children = session.exec(select(Category.id).where(Category.parent_id == current)).all()
                     cat_ids.extend(children)
                     to_check.extend(children)
-                    
                 query = query.where(Schematic.category_id.in_(cat_ids))
 
-            all_schematics = session.exec(query.order_by(Schematic.name)).all()
-
-            # 2. Carga en bloque (Batch) de tags y relaciones (1 sola consulta en vez de N+1)
-            all_tags = {t.id: t for t in session.exec(select(Tag)).all()}
-            all_links = session.exec(select(SchematicTagLink)).all()
-            schem_tags_map: dict[int, list[Tag]] = {}
-            for l in all_links:
-                if l.tag_id in all_tags:
-                    schem_tags_map.setdefault(l.schematic_id, []).append(all_tags[l.tag_id])
-
-            filtered = []
-            tag_set = set(self._active_tags) if self._active_tags else None
+            # 1.2 Filtrar por búsqueda
             q = self._search_query
+            if q:
+                query = query.where(
+                    or_(
+                        Schematic.name.icontains(q),
+                        Schematic.description.icontains(q)
+                    )
+                )
 
-            for s in all_schematics:
-                # Asignar tags en memoria sin tocar SQLite
-                s_tags = schem_tags_map.get(s.id, [])
-                setattr(s, "_cached_tags", s_tags)
+            # 1.3 Filtrar por tags (Lógica OR: coincide con cualquier tag seleccionado)
+            tag_set = set(self._active_tags) if self._active_tags else None
+            if tag_set:
+                query = query.join(SchematicTagLink).where(SchematicTagLink.tag_id.in_(tag_set)).distinct()
 
-                # Filtrar por tags
-                if tag_set:
-                    s_tag_ids = {t.id for t in s_tags}
-                    if not (tag_set & s_tag_ids):
-                        continue
-
-                # Filtrar por búsqueda
-                if q:
-                    s_name = (s.name or "").lower()
-                    s_desc = (s.description or "").lower()
-                    if q not in s_name and q not in s_desc:
-                        continue
-
-                filtered.append(s)
-
-            # Si no hay filtros, agrupamos por categoría y mostramos carruseles
+            # 2. Render agrupado si no hay filtros
             if not self._active_category and not tag_set and not q:
                 self._pagination_container.clear()
-                total_items = len(filtered)
+                total_items = session.exec(select(func.count(Schematic.id))).one()
                 self._count_badge.text = str(total_items)
                 
                 with self._grid_container:
-                    if not filtered:
+                    if total_items == 0:
                         self._render_empty_state()
                     else:
-                        self._render_grouped_recent(session, filtered)
+                        self._render_grouped_recent(session)
                 return
 
-            total_items = len(filtered)
+            # 3. Paginación y Conteo (cuando hay filtros)
+            total_items = session.exec(select(func.count()).select_from(query.subquery())).one()
             self._count_badge.text = str(total_items)
 
             total_pages = max(1, (total_items + self._page_size - 1) // self._page_size)
@@ -275,11 +273,31 @@ class HomePage:
                 self._current_page = total_pages
 
             start_idx = (self._current_page - 1) * self._page_size
-            end_idx = start_idx + self._page_size
-            page_items = filtered[start_idx:end_idx]
+            
+            # Ejecutar consulta SQL con LIMIT y OFFSET
+            page_items = session.exec(query.order_by(Schematic.name).offset(start_idx).limit(self._page_size)).all()
 
+            # 4. Carga en bloque (Batch) de tags SÓLO para los items de la página actual
+            if page_items:
+                item_ids = [s.id for s in page_items]
+                links = session.exec(select(SchematicTagLink).where(SchematicTagLink.schematic_id.in_(item_ids))).all()
+                tags_needed = {link.tag_id for link in links}
+                
+                if tags_needed:
+                    tag_objs = {t.id: t for t in session.exec(select(Tag).where(Tag.id.in_(tags_needed))).all()}
+                else:
+                    tag_objs = {}
+                
+                schem_tags_map = {}
+                for l in links:
+                    if l.tag_id in tag_objs:
+                        schem_tags_map.setdefault(l.schematic_id, []).append(tag_objs[l.tag_id])
+                
+                for s in page_items:
+                    setattr(s, "_cached_tags", schem_tags_map.get(s.id, []))
+            
             with self._grid_container:
-                if not filtered:
+                if not page_items:
                     self._render_empty_state()
                 else:
                     for schem in page_items:
@@ -327,58 +345,68 @@ class HomePage:
 
     def _render_empty_state(self) -> None:
         from app.i18n import _t
-        with ui.column().classes("empty-state"):
-            ui.icon("inventory_2", size="4rem").style("color: var(--text-muted)")
-            ui.label(_t("home.empty_title", default="No se encontraron litemáticas")).classes("empty-title")
-            ui.label(_t("home.empty_subtitle", default="Prueba con otra categoría, etiqueta o término de búsqueda.")).classes("empty-subtitle")
+        with ui.column().classes("empty-state items-center justify-center p-8"):
+            # Lottie animation web player
+            ui.html('<lottie-player src="https://lottie.host/890eb99f-e3c1-4560-afcb-ea31b54c8612/D7f232r9yD.json" background="transparent" speed="1" style="width: 220px; height: 220px; opacity: 0.8;" loop autoplay></lottie-player>')
+            ui.label(_t("home.empty_title", default="No se encontraron litemáticas")).classes("empty-title mt-2")
+            ui.label(_t("home.empty_subtitle", default="Prueba con otra categoría, etiqueta o término de búsqueda.")).classes("empty-subtitle text-center")
 
-    def _render_grouped_recent(self, session, all_schematics: list[Schematic]) -> None:
+    def _render_grouped_recent(self, session) -> None:
         """Renderiza las construcciones agrupadas por categoría padre mostrando las más recientes (máximo 50 en total)."""
         from app.i18n import _t
+        from sqlmodel import select
+        from app.db.models import SchematicTagLink, Tag
+
         all_cats = session.exec(select(Category)).all()
         parent_cats = [c for c in all_cats if c.parent_id is None]
         parent_cats.sort(key=lambda x: x.name)
         
-        parent_map = {c.id: c.parent_id for c in all_cats}
-        
-        def get_root(cid: int) -> int:
-            curr = cid
-            while parent_map.get(curr) is not None:
-                curr = parent_map[curr]
-            return curr
-            
-        cat_to_root = {c.id: get_root(c.id) for c in all_cats}
-        
-        groups: dict[int, list[Schematic]] = {p.id: [] for p in parent_cats}
-        groups[0] = []
-        
-        for s in all_schematics:
-            if s.category_id in cat_to_root:
-                root_id = cat_to_root[s.category_id]
-                if root_id in groups:
-                    groups[root_id].append(s)
-                else:
-                    groups[0].append(s)
-            else:
-                groups[0].append(s)
+        def get_all_children_recursively(cid: int) -> list[int]:
+            result = [cid]
+            to_process = [cid]
+            while to_process:
+                current = to_process.pop(0)
+                children = [c.id for c in all_cats if c.parent_id == current]
+                result.extend(children)
+                to_process.extend(children)
+            return result
 
         total_shown = 0
-        MAX_GLOBAL = 50
+        MAX_GLOBAL = 150
 
         with ui.column().classes("w-full gap-8 mt-2"):
             for p in parent_cats:
                 if total_shown >= MAX_GLOBAL:
                     break
                     
-                items = groups[p.id]
+                cat_ids = get_all_children_recursively(p.id)
+                items = session.exec(
+                    select(Schematic)
+                    .where(Schematic.category_id.in_(cat_ids))
+                    .order_by(Schematic.id.desc())
+                    .limit(min(12, MAX_GLOBAL - total_shown))
+                ).all()
+                
                 if not items:
                     continue
-                
-                # Mostrar hasta que lleguemos al máximo global, limitando a 12 por categoría
-                items.sort(key=lambda x: x.id, reverse=True)
-                limit = min(12, MAX_GLOBAL - total_shown)
-                display_items = items[:limit]
-                total_shown += len(display_items)
+
+                # Cargar tags de los items mostrados
+                item_ids = [s.id for s in items]
+                links = session.exec(select(SchematicTagLink).where(SchematicTagLink.schematic_id.in_(item_ids))).all()
+                if links:
+                    tags_needed = {link.tag_id for link in links}
+                    tag_objs = {t.id: t for t in session.exec(select(Tag).where(Tag.id.in_(tags_needed))).all()}
+                    schem_tags_map = {}
+                    for l in links:
+                        if l.tag_id in tag_objs:
+                            schem_tags_map.setdefault(l.schematic_id, []).append(tag_objs[l.tag_id])
+                    for s in items:
+                        setattr(s, "_cached_tags", schem_tags_map.get(s.id, []))
+                else:
+                    for s in items:
+                        setattr(s, "_cached_tags", [])
+
+                total_shown += len(items)
                 
                 with ui.column().classes("w-full gap-3"):
                     with ui.row().classes("items-center justify-between w-full px-2"):
@@ -386,10 +414,10 @@ class HomePage:
                             ui.icon("folder_special", size="1.2rem").style("color: var(--accent)")
                             ui.label(p.name).style("font-size: 1.15rem; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;")
                         
-                        ui.button(_t("home.view_all", default="Ver todos"), on_click=lambda _id=p.id: self._on_filter_change(_id, [])).props("flat dense").style("font-size: 0.8rem; color: var(--accent-light);")
+                        ui.button(_t("home.view_all", default="Ver todos"), on_click=lambda _id=p.id: self._on_filter_change(_id, [])).props("outline rounded size=sm").style("border-color: rgba(27, 217, 106, 0.4); color: var(--accent-light); font-weight: 600; padding: 4px 16px; font-size: 0.75rem;")
                     
                     with ui.element("div").classes("schematics-grid-single-row"):
-                        for schem in display_items:
+                        for schem in items:
                             card = SchematicCard(
                                 schematic=schem,
                                 on_select=self._on_card_select,
@@ -399,27 +427,47 @@ class HomePage:
                             )
                             self._cards[schem.id] = card
 
-            if groups[0] and total_shown < MAX_GLOBAL:
-                groups[0].sort(key=lambda x: x.id, reverse=True)
-                limit = min(12, MAX_GLOBAL - total_shown)
-                display_items = groups[0][:limit]
-                total_shown += len(display_items)
-                
-                with ui.column().classes("w-full gap-3"):
-                    with ui.row().classes("items-center justify-between w-full px-2"):
-                        with ui.row().classes("items-center gap-2"):
-                            ui.icon("help_outline", size="1.2rem").style("color: var(--text-muted)")
-                            ui.label("Sin Categoría").style("font-size: 1.15rem; font-weight: 700; color: var(--text-primary); text-transform: uppercase;")
-                    with ui.element("div").classes("schematics-grid-single-row"):
-                        for schem in display_items:
-                            card = SchematicCard(
-                                schematic=schem,
-                                on_select=self._on_card_select,
-                                on_click=self._on_card_click,
-                                on_delete=self._on_card_delete,
-                                is_selected=schem.id in self._selected_ids,
-                            )
-                            self._cards[schem.id] = card
+            if total_shown < MAX_GLOBAL:
+                items_no_cat = session.exec(
+                    select(Schematic)
+                    .where(Schematic.category_id == None)
+                    .order_by(Schematic.id.desc())
+                    .limit(min(12, MAX_GLOBAL - total_shown))
+                ).all()
+
+                if items_no_cat:
+                    item_ids = [s.id for s in items_no_cat]
+                    links = session.exec(select(SchematicTagLink).where(SchematicTagLink.schematic_id.in_(item_ids))).all()
+                    if links:
+                        tags_needed = {link.tag_id for link in links}
+                        tag_objs = {t.id: t for t in session.exec(select(Tag).where(Tag.id.in_(tags_needed))).all()}
+                        schem_tags_map = {}
+                        for l in links:
+                            if l.tag_id in tag_objs:
+                                schem_tags_map.setdefault(l.schematic_id, []).append(tag_objs[l.tag_id])
+                        for s in items_no_cat:
+                            setattr(s, "_cached_tags", schem_tags_map.get(s.id, []))
+                    else:
+                        for s in items_no_cat:
+                            setattr(s, "_cached_tags", [])
+
+                    total_shown += len(items_no_cat)
+                    
+                    with ui.column().classes("w-full gap-3"):
+                        with ui.row().classes("items-center justify-between w-full px-2"):
+                            with ui.row().classes("items-center gap-2"):
+                                ui.icon("help_outline", size="1.2rem").style("color: var(--text-muted)")
+                                ui.label("Sin Categoría").style("font-size: 1.15rem; font-weight: 700; color: var(--text-primary); text-transform: uppercase;")
+                        with ui.element("div").classes("schematics-grid-single-row"):
+                            for schem in items_no_cat:
+                                card = SchematicCard(
+                                    schematic=schem,
+                                    on_select=self._on_card_select,
+                                    on_click=self._on_card_click,
+                                    on_delete=self._on_card_delete,
+                                    is_selected=schem.id in self._selected_ids,
+                                )
+                                self._cards[schem.id] = card
 
     # FAB ─────────────────────────────────────────────────────────────────
 
