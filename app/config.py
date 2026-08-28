@@ -11,6 +11,12 @@ import sys
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
+# Configuración Principal
+# ---------------------------------------------------------------------------
+APP_VERSION = "1.0.0"
+GITHUB_REPO = "Aosiika/LiteVault"
+
+# ---------------------------------------------------------------------------
 # Rutas base
 # ---------------------------------------------------------------------------
 
@@ -20,12 +26,17 @@ if getattr(sys, "frozen", False):
     # Ejecutable PyInstaller
     APP_DIR: Path = Path(sys._MEIPASS) / "app"          # type: ignore[attr-defined]
     BASE_DIR: Path = Path(sys.executable).parent
+    # Usar %APPDATA%/LiteVault para no requerir permisos de Administrador
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        STORAGE_DIR: Path = Path(appdata) / "LiteVault" / "storage"
+    else:
+        STORAGE_DIR: Path = Path.home() / ".litevault" / "storage"
 else:
     APP_DIR = Path(__file__).parent.resolve()
     BASE_DIR = APP_DIR.parent
+    STORAGE_DIR = BASE_DIR.parent / "storage"
 
-# storage/ está al mismo nivel que litevault/ (directorio hermano del repo)
-STORAGE_DIR: Path = BASE_DIR.parent / "storage"
 SCHEMATICS_DIR: Path = STORAGE_DIR / "schematics"
 THUMBNAILS_DIR: Path = STORAGE_DIR / "thumbnails"
 DB_PATH: Path = STORAGE_DIR / "litevault.db"

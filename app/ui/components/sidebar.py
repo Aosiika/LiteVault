@@ -72,11 +72,12 @@ class Sidebar:
                     on_click=lambda: ui.navigate.to("/categories"),
                 ).classes(f"w-full justify-start {'btn-primary' if self._active_tab == 'categories' else 'btn-secondary'}").style("font-size:0.85rem;")
 
-                ui.button(
-                    _t("sidebar.tags"),
-                    icon="label",
-                    on_click=lambda: ui.navigate.to("/tags"),
-                ).classes(f"w-full justify-start {'btn-primary' if self._active_tab == 'tags' else 'btn-secondary'}").style("font-size:0.85rem;")
+                # Botón de tags eliminado visualmente según petición del usuario
+                # ui.button(
+                #     _t("sidebar.tags"),
+                #     icon="label",
+                #     on_click=lambda: ui.navigate.to("/tags"),
+                # ).classes(f"w-full justify-start {'btn-primary' if self._active_tab == 'tags' else 'btn-secondary'}").style("font-size:0.85rem;")
 
             ui.separator().style("border-color: var(--border); margin: 6px 0;")
 
@@ -98,15 +99,16 @@ class Sidebar:
 
             ui.separator().style("border-color: var(--border); margin: 6px 0;")
 
-            # Encabezado Tags
-            with ui.row().classes("items-center justify-between w-full px-2"):
-                ui.label(_t("sidebar.tags")).classes("sidebar-section-title")
-                ui.button(
-                    icon="edit",
-                    on_click=lambda: ui.navigate.to("/tags"),
-                ).props("flat round dense size=xs").classes("text-[var(--accent)]").tooltip("Gestionar tags")
+            # Encabezado Tags (Oculto visualmente)
+            # with ui.row().classes("items-center justify-between w-full px-2"):
+            #     ui.label(_t("sidebar.tags")).classes("sidebar-section-title")
+            #     ui.button(
+            #         icon="edit",
+            #         on_click=lambda: ui.navigate.to("/tags"),
+            #     ).props("flat round dense size=xs").classes("text-[var(--accent)]").tooltip("Gestionar tags")
 
-            self._tags_container = ui.row().classes("flex-wrap gap-1.5 px-1")
+            # Contenedor de tags oculto para mantener la lógica funcionando sin mostrarlo
+            self._tags_container = ui.row().style("display: none;")
             self._render_tags()
             
             ui.space()

@@ -68,11 +68,11 @@ class SchematicCard:
 
             # Cuerpo de la tarjeta (click → detalle) ───────────────────────
             with ui.element("div").classes("w-full flex flex-col cursor-pointer").on("click", self._handle_click):
-                # Thumbnail con fondo de slot Minecraft
                 with ui.element("div").classes("card-thumbnail-wrapper"):
                     thumb_url = thumb_to_url(s.thumbnail_path)
                     if thumb_url:
-                        ui.image(thumb_url).classes("card-thumbnail-img")
+                        # Añadimos loading lazy nativo para optimizar el renderizado del DOM en listas largas
+                        ui.image(thumb_url).classes("card-thumbnail-img").props('loading="lazy" decoding="async"')
                     else:
                         ui.icon("inventory_2", size="3rem").style("color: var(--border-hover)")
 

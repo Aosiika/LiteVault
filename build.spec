@@ -23,14 +23,12 @@ a = Analysis(
     pathex=[str(BASE)],
     binaries=[],
     datas=[
-        # Visor 3D Three.js
-        (str(BASE / "app" / "static" / "viewer3d"), "app/static/viewer3d"),
-        # Texturas oficiales
-        (str(BASE / "app" / "static" / "textures"), "app/static/textures"),
-        # Iconos de la app
-        (str(BASE / "app" / "static" / "icons"),   "app/static/icons"),
+        # Toda la carpeta estática (incluye visor 3D, texturas, CSS, e iconos)
+        (str(BASE / "app" / "static"), "app/static"),
+        # Traducciones i18n (.json)
+        (str(BASE / "app" / "i18n" / "*.json"), "app/i18n"),
         # Assets
-        (str(BASE / "app" / "assets"),              "app/assets"),
+        (str(BASE / "app" / "assets"), "app/assets"),
     ],
     hiddenimports=[
         "nicegui",
@@ -79,5 +77,5 @@ exe = EXE(  # noqa: F821
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    # icon=str(BASE / "app" / "assets" / "icon.ico"),  # descomenta si tienes icono .ico
+    icon=str(BASE / "logo.ico"),
 )

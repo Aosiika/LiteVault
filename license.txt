@@ -1,0 +1,19 @@
+Acuerdo de Licencia y Aviso Legal
+=================================
+
+LiteVault es un proyecto de software de código abierto desarrollado por Aosika.
+Año: 2026
+
+Al instalar este software, aceptas las siguientes condiciones:
+
+1. USO DEL SOFTWARE
+El software se proporciona "tal cual", sin garantía de ningún tipo, expresa o implícita. En ningún caso los autores o titulares del copyright serán responsables de ninguna reclamación, daño u otra responsabilidad que surja de su uso.
+
+2. AVISO SOBRE MARCAS
+LiteVault NO está afiliado, asociado, autorizado, respaldado ni conectado oficialmente de ninguna manera con Mojang AB, Microsoft Corporation, ni con ninguna de sus subsidiarias o afiliados.
+El nombre "Minecraft" y los recursos del juego son marcas registradas de Mojang AB.
+
+3. DESARROLLO Y CÓDIGO ABIERTO
+Esta aplicación es de código libre y está en constante desarrollo. Si encuentras errores o quieres proponer mejoras, eres bienvenido a participar en el repositorio oficial de GitHub.
+
+Disfruta de LiteVault.

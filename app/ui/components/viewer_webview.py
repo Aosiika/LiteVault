@@ -103,11 +103,6 @@ def _render_3d_native_viewer(payload: dict) -> None:
     # Barra de herramientas superior derecha ─────────────────────────────
     with ui.row().classes("absolute top-3 right-3 gap-1 z-10 p-1 rounded-xl").style("background: rgba(15,17,26,0.85); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.08);"):
         ui.button(
-            icon="360",
-            on_click=lambda: ui.run_javascript("window.toggleSchemAutoRotate && window.toggleSchemAutoRotate();"),
-        ).props("flat round dense size=sm").style("color: #cbd5e1;").tooltip("Giro automático (360°)")
-
-        ui.button(
             icon="center_focus_strong",
             on_click=lambda: ui.run_javascript("window.resetSchemCamera && window.resetSchemCamera();"),
         ).props("flat round dense size=sm").style("color: #cbd5e1;").tooltip("Centrar cámara")
@@ -126,7 +121,7 @@ def _render_3d_native_viewer(payload: dict) -> None:
                 ymax = val.get("max", size_y - 1) if isinstance(val, dict) else size_y - 1
                 ui.run_javascript(f"window.setSchemLayerSlice && window.setSchemLayerSlice({ymin}, {ymax});")
 
-            slider.on("update:model-value", _on_slice_change)
+            slider.on("update:model-value", _on_slice_change, throttle=0.05)
 
     # Guía de controles inferior izquierda ────────────────────────────────
     with ui.row().classes("absolute bottom-3 left-3 items-center gap-1 z-10 px-3 py-1.5 rounded-lg pointer-events-none").style("background: rgba(15,17,26,0.75); border: 1px solid rgba(255,255,255,0.06); font-size: 0.72rem; color: #64748b;"):
