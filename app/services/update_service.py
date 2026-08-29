@@ -85,6 +85,14 @@ async def download_and_install_update(download_url: str, progress_callback: Call
     # Run the installer detached
     if sys.platform == "win32":
         import ctypes
+        import os
+        # Prevenir "Security validation failure: parent process has different executable!"
+        # PyInstaller usa _MEIPASS2 para detectar subprocesos. Si el instalador hereda esto
+        # y reabre la app, la app cree que es un subproceso pero el hash no coincide.
+        for var in ["_MEIPASS2", "_PYINSTALLER_INIT"]:
+            if var in os.environ:
+                del os.environ[var]
+                
         ctypes.windll.shell32.ShellExecuteW(None, "open", str(installer_path), "/SILENT", None, 1)
     else:
         subprocess.Popen([str(installer_path)])
