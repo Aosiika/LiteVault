@@ -11,6 +11,8 @@ AppSupportURL=https://github.com/Aosiika/LiteVault
 AppUpdatesURL=https://github.com/Aosiika/LiteVault
 DefaultDirName={autopf}\LiteVault
 DisableProgramGroupPage=yes
+CloseApplications=force
+RestartApplications=yes
 ; Uncomment the following line to run in non administrative install mode (install for current user only.)
 ;PrivilegesRequired=lowest
 OutputDir=.\installer
