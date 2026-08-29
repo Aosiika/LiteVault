@@ -84,6 +84,7 @@ async def download_and_install_update(download_url: str, progress_callback: Call
     
     # Run the installer detached
     if sys.platform == "win32":
-        os.startfile(str(installer_path))
+        import ctypes
+        ctypes.windll.shell32.ShellExecuteW(None, "open", str(installer_path), "/SILENT", None, 1)
     else:
         subprocess.Popen([str(installer_path)])
