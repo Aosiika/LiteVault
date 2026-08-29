@@ -81,9 +81,13 @@ async def download_and_install_update(download_url: str, progress_callback: Call
                         progress_callback(downloaded / total_size)
 
     await asyncio.to_thread(_download)
-    
-    # Run the installer detached
+    # Run the installer detached with cleaned environment to prevent PyInstaller security validation failure
+    env = os.environ.copy()
+    for var in ["_MEIPASS2", "_MEIPASS", "_PYINSTALLER_INIT"]:
+        env.pop(var, None)
+
     if sys.platform == "win32":
-        os.startfile(str(installer_path))
+        DETACHED_PROCESS = 0x00000008
+        subprocess.Popen([str(installer_path), "/SILENT"], env=env, creationflags=DETACHED_PROCESS)
     else:
-        subprocess.Popen([str(installer_path)])
+        subprocess.Popen([str(installer_path)], env=env)

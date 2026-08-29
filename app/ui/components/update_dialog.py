@@ -36,9 +36,12 @@ def open_update_dialog(version: str, notes: str, download_url: str, is_manual: b
                     await download_and_install_update(download_url, _update_progress)
                     progress_label.text = _t("update.download_complete")
                     progress_label.classes("text-[var(--accent)]")
-                    await asyncio.sleep(1.5)
-                    # Let the Inno Setup installer handle closing the app via CloseApplications=force
-                    dialog.close()
+                    await asyncio.sleep(1.0)
+                    # Forzar el cierre de la aplicación actual para que el instalador pueda machacar los archivos
+                    from nicegui import app
+                    app.shutdown()
+                    import os
+                    os._exit(0)
                 except Exception as e:
                     ui.notify(_t("update.download_error", error=e), color="negative")
                     dialog.close()
