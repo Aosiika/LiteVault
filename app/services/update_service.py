@@ -81,13 +81,23 @@ async def download_and_install_update(download_url: str, progress_callback: Call
                         progress_callback(downloaded / total_size)
 
     await asyncio.to_thread(_download)
-    # Run the installer detached with cleaned environment to prevent PyInstaller security validation failure
-    env = os.environ.copy()
-    for var in ["_MEIPASS2", "_MEIPASS", "_PYINSTALLER_INIT"]:
-        env.pop(var, None)
-
+    # En Windows, para evitar el 'Security validation failure' de PyInstaller,
+    # debemos limpiar las variables de entorno a nivel de OS. Un script .bat es lo más seguro.
     if sys.platform == "win32":
+        bat_path = installer_path.with_suffix('.bat')
+        bat_content = f"""@echo off
+set _MEIPASS2=
+set _MEIPASS=
+set _PYINSTALLER_INIT=
+start "" "{installer_path}" /SILENT
+"""
+        with open(bat_path, "w") as f:
+            f.write(bat_content)
+        
         DETACHED_PROCESS = 0x00000008
-        subprocess.Popen([str(installer_path), "/SILENT"], env=env, creationflags=DETACHED_PROCESS)
+        subprocess.Popen(["cmd.exe", "/c", str(bat_path)], creationflags=DETACHED_PROCESS)
     else:
+        env = os.environ.copy()
+        for var in ["_MEIPASS2", "_MEIPASS", "_PYINSTALLER_INIT"]:
+            env.pop(var, None)
         subprocess.Popen([str(installer_path)], env=env)
