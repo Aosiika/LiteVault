@@ -130,87 +130,147 @@ def _render_3d_native_viewer(payload: dict) -> None:
 
 
 def _render_meta(schematic: Schematic, dialog, refresh_fn: Optional[Callable] = None) -> None:
-    """Renderiza el panel lateral izquierdo con todos los metadatos editables."""
+    """Renderiza el panel lateral izquierdo con pestañas de Info y Materiales."""
+    from app.services.schematic_service import get_schematic_materials
 
-    # Dimensiones y bloques
-    with ui.column().classes("gap-1"):
-        with ui.row().classes("items-center gap-2"):
-            ui.icon("straighten", size="1rem").style("color: var(--accent)")
-            ui.label("Dimensiones").classes("meta-label")
-        ui.label(schematic.dimensions or "—").classes("meta-value")
+    with ui.tabs().classes("w-full text-[var(--text-secondary)] active:text-white").props("dense") as tabs:
+        info_tab = ui.tab("Info", icon="info")
+        mat_tab = ui.tab("Materiales", icon="inventory_2")
 
-    with ui.column().classes("gap-1"):
-        with ui.row().classes("items-center gap-2"):
-            ui.icon("view_in_ar", size="1rem").style("color: var(--accent)")
-            ui.label("Bloques").classes("meta-label")
-        ui.label(f"{schematic.block_count:,}" if schematic.block_count else "—").classes("meta-value")
+    with ui.tab_panels(tabs, value=info_tab).classes("w-full bg-transparent flex-1 p-0"):
+        with ui.tab_panel(info_tab).classes("p-0 w-full flex-col gap-3"):
+            # Dimensiones y bloques
+            with ui.column().classes("gap-1"):
+                with ui.row().classes("items-center gap-2"):
+                    ui.icon("straighten", size="1rem").style("color: var(--accent)")
+                    ui.label("Dimensiones").classes("meta-label")
+                ui.label(schematic.dimensions or "—").classes("meta-value")
 
-    # Versión de Minecraft
-    with ui.column().classes("gap-1"):
-        with ui.row().classes("items-center gap-2"):
-            ui.icon("extension", size="1rem").style("color: var(--accent)")
-            ui.label("Versión").classes("meta-label")
-        ui.label(schematic.minecraft_version or "—").classes("meta-value")
+            with ui.column().classes("gap-1"):
+                with ui.row().classes("items-center gap-2"):
+                    ui.icon("view_in_ar", size="1rem").style("color: var(--accent)")
+                    ui.label("Bloques").classes("meta-label")
+                ui.label(f"{schematic.block_count:,}" if schematic.block_count else "—").classes("meta-value")
 
-    # Categoría
-    with ui.column().classes("gap-1"):
-        with ui.row().classes("items-center gap-2"):
-            ui.icon("folder", size="1rem").style("color: var(--accent)")
-            ui.label("Categoría").classes("meta-label")
-        cat_name = "—"
-        if schematic.category_id:
-            with get_session() as session:
-                cat = session.get(Category, schematic.category_id)
-                cat_name = cat.name if cat else "—"
-        ui.label(cat_name).classes("meta-value")
+            # Versión de Minecraft
+            with ui.column().classes("gap-1"):
+                with ui.row().classes("items-center gap-2"):
+                    ui.icon("extension", size="1rem").style("color: var(--accent)")
+                    ui.label("Versión").classes("meta-label")
+                ui.label(schematic.minecraft_version or "—").classes("meta-value")
 
-    # Tags
-    with ui.column().classes("gap-1"):
-        with ui.row().classes("items-center gap-2"):
-            ui.icon("label", size="1rem").style("color: var(--accent)")
-            ui.label("Tags").classes("meta-label")
-        if schematic.tags:
-            with ui.row().classes("flex-wrap gap-1"):
-                for tag in schematic.tags:
-                    color = getattr(tag, "color", "#1bd96a") or "#1bd96a"
-                    ui.badge(f"#{tag.name}").classes("tag-chip").style(
-                        f"background:{color}25; border:1px solid {color}88; color:#ffffff; font-size:0.75rem;"
+            # Categoría
+            with ui.column().classes("gap-1"):
+                with ui.row().classes("items-center gap-2"):
+                    ui.icon("folder", size="1rem").style("color: var(--accent)")
+                    ui.label("Categoría").classes("meta-label")
+                cat_name = "—"
+                if schematic.category_id:
+                    with get_session() as session:
+                        cat = session.get(Category, schematic.category_id)
+                        cat_name = cat.name if cat else "—"
+                ui.label(cat_name).classes("meta-value")
+
+            # Tags
+            with ui.column().classes("gap-1"):
+                with ui.row().classes("items-center gap-2"):
+                    ui.icon("label", size="1rem").style("color: var(--accent)")
+                    ui.label("Tags").classes("meta-label")
+                if schematic.tags:
+                    with ui.row().classes("flex-wrap gap-1"):
+                        for tag in schematic.tags:
+                            color = getattr(tag, "color", "#1bd96a") or "#1bd96a"
+                            ui.badge(f"#{tag.name}").classes("tag-chip").style(
+                                f"background:{color}25; border:1px solid {color}88; color:#ffffff; font-size:0.75rem;"
+                            )
+                else:
+                    ui.label("Sin tags").classes("meta-value")
+
+            # Descripción
+            if schematic.description:
+                with ui.column().classes("gap-1"):
+                    with ui.row().classes("items-center gap-2"):
+                        ui.icon("notes", size="1rem").style("color: var(--accent)")
+                        ui.label("Descripción").classes("meta-label")
+                    ui.label(schematic.description).classes("meta-value").style(
+                        "white-space: pre-wrap; word-break: break-word"
                     )
-        else:
-            ui.label("Sin tags").classes("meta-value")
 
-    # Descripción
-    if schematic.description:
-        with ui.column().classes("gap-1"):
-            with ui.row().classes("items-center gap-2"):
-                ui.icon("notes", size="1rem").style("color: var(--accent)")
-                ui.label("Descripción").classes("meta-label")
-            ui.label(schematic.description).classes("meta-value").style(
-                "white-space: pre-wrap; word-break: break-word"
-            )
+            ui.separator().style("border-color: var(--border)")
 
-    ui.separator().style("border-color: var(--border)")
+            # Ruta del archivo
+            with ui.column().classes("gap-1"):
+                ui.label("Archivo").classes("meta-label")
+                ui.label(schematic.file_path.split("\\")[-1]).classes("meta-value-sm")
 
-    # Ruta del archivo
-    with ui.column().classes("gap-1"):
-        ui.label("Archivo").classes("meta-label")
-        ui.label(schematic.file_path.split("\\")[-1]).classes("meta-value-sm")
+            ui.separator().style("border-color: var(--border)")
 
-    ui.separator().style("border-color: var(--border)")
+            # Botones
+            with ui.column().classes("gap-2 w-full mt-auto mb-2"):
+                ui.button(
+                    "Editar metadatos",
+                    icon="edit",
+                    on_click=lambda: _open_edit_dialog(schematic, dialog, refresh_fn),
+                ).classes("btn-secondary w-full")
 
-    # Botones
-    with ui.column().classes("gap-2 w-full"):
-        ui.button(
-            "Editar metadatos",
-            icon="edit",
-            on_click=lambda: _open_edit_dialog(schematic, dialog, refresh_fn),
-        ).classes("btn-secondary w-full")
+                ui.button(
+                    "Eliminar",
+                    icon="delete",
+                    on_click=lambda: _confirm_delete(schematic, dialog, refresh_fn),
+                ).classes("btn-danger w-full")
 
-        ui.button(
-            "Eliminar",
-            icon="delete",
-            on_click=lambda: _confirm_delete(schematic, dialog, refresh_fn),
-        ).classes("btn-danger w-full")
+        # Pestaña de Materiales
+        with ui.tab_panel(mat_tab).classes("p-0 w-full flex-col gap-2"):
+            with ui.row().classes("items-center gap-2 mb-1"):
+                ui.icon("inventory_2", size="1.2rem").style("color: var(--accent)")
+                ui.label("Lista de Materiales").classes("meta-label").style("font-size: 1rem;")
+                
+            # Spinner de carga mientras calcula (si es grande)
+            spinner = ui.spinner("dots", size="lg").style("color: var(--accent); align-self: center; margin-top: 2rem;")
+            
+            # Contenedor principal de la lista
+            mat_container = ui.column().classes("w-full gap-2 pr-1 pb-4").style("overflow-y: auto; overflow-x: hidden; max-height: calc(88vh - 120px);")
+            mat_container.set_visibility(False)
+
+            async def _load_materials():
+                import asyncio
+                # Ejecutar el conteo en un thread para no bloquear la UI principal
+                loop = asyncio.get_event_loop()
+                materials = await loop.run_in_executor(None, get_schematic_materials, schematic.id)
+                
+                spinner.delete()
+                mat_container.set_visibility(True)
+                
+                with mat_container:
+                    if not materials:
+                        ui.label("No se encontraron materiales").classes("text-[var(--text-secondary)] text-sm italic mt-4")
+                        return
+                    
+                    html_content = ""
+                    for mat in materials:
+                        parts = []
+                        if mat["shulkers"] > 0: parts.append(f"{mat['shulkers']} sh")
+                        if mat["stacks"] > 0: parts.append(f"{mat['stacks']} st")
+                        if mat["items"] > 0 or (mat["shulkers"] == 0 and mat["stacks"] == 0): parts.append(f"{mat['items']} it")
+                        qty_str = " + ".join(parts)
+                        
+                        html_content += f"""
+                        <div class="flex items-center justify-between w-full p-2 rounded-lg transition-colors" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); flex-wrap: nowrap; margin-bottom: 0.5rem; cursor: default;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'">
+                            <div class="flex items-center gap-2 min-w-0" style="flex: 1; flex-wrap: nowrap; overflow: hidden;" title="{mat['raw_name']}">
+                                <img src="/api/icon/{mat['raw_name']}" style="width: 24px; height: 24px; image-rendering: pixelated; flex-shrink: 0;" loading="lazy">
+                                <span class="text-sm text-gray-200 whitespace-nowrap overflow-hidden" style="text-overflow: ellipsis;">{mat['clean_name']}</span>
+                            </div>
+                            <div class="flex flex-col items-end gap-0 flex-shrink-0" title="Total: {mat['total']} bloques">
+                                <span class="text-sm font-bold text-white leading-none">{mat['total']:,}</span>
+                                <span class="font-semibold leading-tight" style="font-size: 0.65rem; color: var(--accent); opacity: 0.9;">{qty_str}</span>
+                            </div>
+                        </div>
+                        """
+                    
+                    ui.html(html_content).classes("w-full")
+
+            # Cargar los materiales de forma asíncrona al mostrar el panel
+            ui.timer(0.1, _load_materials, once=True)
 
 
 def _open_edit_dialog(schematic: Schematic, parent_dialog, refresh_fn: Optional[Callable] = None) -> None:

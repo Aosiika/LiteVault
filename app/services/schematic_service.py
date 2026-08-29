@@ -236,3 +236,117 @@ def read_metadata(filepath: str | Path) -> SchematicMeta:
 
     logger.warning("No se pudo extraer metadata de %s — usando valores por defecto", path)
     return SchematicMeta(dimensions="?x?x?", block_count=0, minecraft_version=mc_version)
+
+
+def get_schematic_materials(schematic_id: int) -> list[dict]:
+    """
+    Cuenta los bloques reales (no-aire) usando Nucleation, agrupando por nombre.
+    Retorna una lista ordenada de mayor a menor cantidad con matemáticas de Shulkers.
+    """
+    import json
+    from app.db.database import get_session
+    from app.db.models import Schematic
+
+    with get_session() as session:
+        schem = session.get(Schematic, schematic_id)
+        if not schem:
+            return []
+
+        try:
+            from pathlib import Path
+            from app.config import SCHEMATICS_DIR
+            actual_path = Path(schem.file_path)
+            if not actual_path.exists():
+                actual_path = SCHEMATICS_DIR / actual_path.name
+
+            from nucleation import Schematic as NucSchematic
+            nuc = NucSchematic.load_from_file(str(actual_path))
+            
+            # Obtener todos los bloques (ignora aire por defecto)
+            raw_blocks_json = nuc.get_non_air_blocks_json()
+            blocks_data = json.loads(raw_blocks_json)
+            
+            counts = {}
+            for b in blocks_data:
+                name = b.get("name", "minecraft:stone")
+                clean = name.replace("minecraft:", "")
+                
+                # Filtrar líquidos, aire y bloques técnicos / invisibles
+                if clean in (
+                    "water", "lava", "fire", "soul_fire", "piston_head", "moving_piston",
+                    "air", "cave_air", "void_air", "structure_void", "light", 
+                    "end_gateway", "end_portal", "nether_portal", "barrier", "jigsaw",
+                    "bubble_column", "end_portal_frame", "bedrock", "command_block",
+                    "chain_command_block", "repeating_command_block", "structure_block"
+                ):
+                    continue
+                    
+                # Ignorar la mitad superior/cabeza de bloques múltiples (puertas, camas, plantas altas)
+                props = dict(b.get("properties", []))
+                if props.get("half") == "upper":
+                    continue
+                if props.get("part") == "head":
+                    continue
+                    
+                # Mapear nombres de bloques técnicos al ítem real que se farmea
+                if clean.endswith("_wall_sign"):
+                    clean = clean.replace("_wall_sign", "_sign")
+                elif clean.endswith("_wall_hanging_sign"):
+                    clean = clean.replace("_wall_hanging_sign", "_hanging_sign")
+                elif clean.endswith("_wall_torch"):
+                    clean = clean.replace("_wall_torch", "_torch")
+                elif clean == "tripwire":
+                    clean = "string"
+                elif clean == "redstone_wire":
+                    clean = "redstone"
+                elif clean == "kelp_plant":
+                    clean = "kelp"
+                elif clean == "bamboo_sapling":
+                    clean = "bamboo"
+                elif clean == "melon_stem" or clean == "attached_melon_stem":
+                    clean = "melon_seeds"
+                elif clean == "pumpkin_stem" or clean == "attached_pumpkin_stem":
+                    clean = "pumpkin_seeds"
+                elif clean == "cocoa":
+                    clean = "cocoa_beans"
+                elif clean == "potatoes":
+                    clean = "potato"
+                elif clean == "carrots":
+                    clean = "carrot"
+                elif clean == "beetroots":
+                    clean = "beetroot_seeds"
+                elif clean == "wheat":
+                    clean = "wheat_seeds"
+                elif clean == "sweet_berry_bush":
+                    clean = "sweet_berries"
+                elif clean == "piston_extension":
+                    continue
+                
+                counts[clean] = counts.get(clean, 0) + 1
+
+            materials = []
+            for clean_name, total in counts.items():
+                shulkers = total // 1728
+                rem = total % 1728
+                stacks = rem // 64
+                items = rem % 64
+                
+                # Nombre limpio para mostrar: "white_stained_glass" -> "White Stained Glass"
+                clean_name_display = clean_name.replace("_", " ").title()
+
+                materials.append({
+                    "raw_name": clean_name,
+                    "clean_name": clean_name_display,
+                    "total": total,
+                    "shulkers": shulkers,
+                    "stacks": stacks,
+                    "items": items
+                })
+
+            # Ordenar por cantidad descendente
+            materials.sort(key=lambda x: x["total"], reverse=True)
+            return materials
+
+        except Exception as exc:
+            logger.error("Error obteniendo materiales para %s: %s", schem.name, exc)
+            return []

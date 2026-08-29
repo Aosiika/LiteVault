@@ -169,15 +169,14 @@ class HomePage:
 
             with ui.element("div").classes("main-content w-full"):
                 self._build_toolbar()
-                
-                # Upload invisible para poder usar self._uploader en _build_toolbar
+                # Upload invisible para soporte interno
                 with ui.element("div").style("display: none;"):
                     self._uploader = ui.upload(
                         multiple=False,
                         on_upload=self._handle_upload,
                         auto_upload=True
                     )
-                
+                    
                 self._grid_container = ui.element("div").classes("schematics-grid w-full mt-4")
                 self._pagination_container = ui.row().classes("items-center justify-center gap-3 w-full py-4")
                 self._load_schematics()
@@ -381,11 +380,17 @@ class HomePage:
                         ui.label(_t("home.empty_dash_3_desc")).classes("text-sm text-gray-400")
 
         else:
-            with ui.column().classes("empty-state items-center justify-center p-8"):
-                # Lottie animation web player
-                ui.html('<lottie-player src="https://lottie.host/890eb99f-e3c1-4560-afcb-ea31b54c8612/D7f232r9yD.json" background="transparent" speed="1" style="width: 220px; height: 220px; opacity: 0.8;" loop autoplay></lottie-player>')
-                ui.label(_t("home.empty_title", default="No se encontraron litemáticas")).classes("empty-title mt-2")
-                ui.label(_t("home.empty_subtitle", default="Prueba con otra categoría, etiqueta o término de búsqueda.")).classes("empty-subtitle text-center")
+            with ui.column().classes("w-full items-center justify-center py-24 px-8"):
+                with ui.column().classes("items-center text-center max-w-lg"):
+                    # Icono decorativo premium
+                    with ui.element("div").classes("p-8 rounded-full mb-6 relative flex items-center justify-center").style("background: radial-gradient(circle, rgba(27, 217, 106, 0.1) 0%, transparent 70%); border: 1px solid rgba(27, 217, 106, 0.15); box-shadow: inset 0 0 20px rgba(27, 217, 106, 0.05);"):
+                        ui.icon("travel_explore", size="4.5rem").style("color: var(--accent); opacity: 0.9; filter: drop-shadow(0 0 12px rgba(27, 217, 106, 0.5));")
+                        
+                    ui.label(_t("home.empty_title", default="No se encontraron litemáticas")).classes("text-2xl font-bold text-white mb-3")
+                    ui.label(_t("home.empty_subtitle", default="Prueba con otra categoría, etiqueta o término de búsqueda diferente.")).classes("text-[var(--text-secondary)] text-[0.95rem] mb-8 leading-relaxed max-w-sm")
+                    
+                    # Botón para limpiar filtros
+                    ui.button("Ver todas las litemáticas", on_click=self._clear_all_filters, icon="clear_all").classes("btn-secondary").style("border-radius: 8px;")
 
     def _render_grouped_recent(self, session) -> None:
         """Renderiza las construcciones agrupadas por categoría padre mostrando las más recientes (máximo 50 en total)."""
@@ -701,7 +706,10 @@ class HomePage:
         finally:
             tmp_path.unlink(missing_ok=True)
 
-    # Handlers ─────────────────────────────────────────────────────────────
+    def _clear_all_filters(self) -> None:
+        self._search_query = ""
+        self._search_input.value = ""
+        self._on_filter_change(None, [])
 
     def _on_filter_change(self, category_id: Optional[int], tag_ids: list[int]) -> None:
         self._active_category = category_id

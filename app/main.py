@@ -73,6 +73,90 @@ async def serve_schematic_file(schematic_id: int):
         )
 
 
+@app.get("/api/icon/{item_name}")
+async def serve_icon(item_name: str):
+    """Sirve el icono de un bloque/ítem directamente desde pack.zip, con alias y búsqueda parcial."""
+    import zipfile
+    import io
+    from fastapi.responses import StreamingResponse
+
+    clean_name = item_name.replace("minecraft:", "")
+    pack_path = STATIC_DIR / "viewer3d" / "pack.zip"
+    
+    if not pack_path.exists():
+        return Response(status_code=404)
+
+    try:
+        with zipfile.ZipFile(pack_path, "r") as z:
+            aliases = {
+                "piston": "piston_side",
+                "sticky_piston": "piston_top_sticky",
+                "observer": "observer_front",
+                "dispenser": "dispenser_front",
+                "dropper": "dropper_front",
+                "redstone_wall_torch": "redstone_torch",
+                "redstone_wire": "redstone_dust_dot",
+                "furnace": "furnace_front",
+                "water": "water_still",
+                "lava": "lava_still",
+                "fire": "fire_0",
+                "chest": "barrel_side", # Chest usa modelo 3D, usamos barrel como placeholder o planks
+                "trapped_chest": "barrel_side",
+            }
+            
+            search_name = aliases.get(clean_name, clean_name)
+            
+            suffixes = [
+                "_stairs", "_slab", "_wall", "_fence", "_fence_gate",
+                "_button", "_pressure_plate", "_trapdoor", "_door",
+                "_wall_sign", "_sign", "_wall_hanging_sign", "_hanging_sign",
+                "_carpet", "_wall_fan"
+            ]
+            for suffix in suffixes:
+                if search_name.endswith(suffix):
+                    base = search_name.replace(suffix, "")
+                    if base in ["oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangrove", "cherry", "bamboo", "crimson", "warped"]:
+                        search_name = f"{base}_planks"
+                    elif base == "stone_brick":
+                        search_name = "stone_bricks"
+                    elif suffix == "_carpet" and base != "moss":
+                        search_name = f"{base}_wool"
+                    elif suffix == "_wall_fan":
+                        search_name = f"{base}_fan"
+                    else:
+                        search_name = base
+                    break
+
+            paths_to_try = [
+                f"assets/minecraft/textures/item/{clean_name}.png",
+                f"assets/minecraft/textures/item/{search_name}.png",
+                f"assets/minecraft/textures/block/{search_name}.png",
+                f"assets/minecraft/textures/block/{clean_name}.png",
+            ]
+            
+            for p in paths_to_try:
+                try:
+                    img_data = z.read(p)
+                    return StreamingResponse(io.BytesIO(img_data), media_type="image/png")
+                except KeyError:
+                    continue
+            
+            # Fuzzy search
+            for f in z.namelist():
+                if f.startswith("assets/minecraft/textures/") and f.endswith(".png"):
+                    filename = f.split("/")[-1].replace(".png", "")
+                    if filename.startswith(search_name) or filename.startswith(clean_name):
+                        img_data = z.read(f)
+                        return StreamingResponse(io.BytesIO(img_data), media_type="image/png")
+                        
+    except Exception as exc:
+        logger.error("Error al extraer icono de %s: %s", clean_name, exc)
+        
+    # Transparente 1x1 fallback
+    pixel = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82'
+    return Response(content=pixel, media_type="image/png")
+
+
 # Páginas ──────────────────────────────────────────────────────────────────
 
 def _inject_css() -> None:
