@@ -1,6 +1,7 @@
 from nicegui import ui
 import sys
 import os
+import asyncio
 from typing import Optional
 
 from app.services.update_service import download_and_install_update
@@ -35,7 +36,7 @@ def open_update_dialog(version: str, notes: str, download_url: str, is_manual: b
                     await download_and_install_update(download_url, _update_progress)
                     progress_label.text = _t("update.download_complete")
                     progress_label.classes("text-[var(--accent)]")
-                    await ui.sleep(1.5)
+                    await asyncio.sleep(1.5)
                     # Forzar el cierre de la aplicación actual para que el instalador pueda machacar los archivos
                     from nicegui import app
                     app.shutdown()
