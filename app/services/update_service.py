@@ -84,6 +84,6 @@ async def download_and_install_update(download_url: str, progress_callback: Call
     
     # Run the installer detached
     if sys.platform == "win32":
-        subprocess.Popen([str(installer_path)], shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE | subprocess.DETACHED_PROCESS)
+        os.startfile(str(installer_path))
     else:
         subprocess.Popen([str(installer_path)])
