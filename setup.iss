@@ -39,7 +39,7 @@ Name: "{autodesktop}\LiteVault"; Filename: "{app}\LiteVault.exe"; Tasks: desktop
 
 [Run]
 Filename: "https://github.com/Aosiika/LiteVault"; Description: "Visitar el Repositorio de GitHub de LiteVault"; Flags: shellexec runasoriginaluser postinstall unchecked
-Filename: "{app}\LiteVault.exe"; Description: "{cm:LaunchProgram,LiteVault}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\LiteVault.exe"; Description: "{cm:LaunchProgram,LiteVault}"; Flags: nowait postinstall runasoriginaluser
 
 [Code]
 var
