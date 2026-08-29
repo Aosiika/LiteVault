@@ -49,7 +49,18 @@ def open_discord_sync_dialog(on_completed: Optional[callable] = None) -> None:
             _t("home.sync_invite_label"),
             value=cur_invite,
             placeholder=_t("home.sync_invite_placeholder"),
-        ).classes("w-full mb-3")
+        ).classes("w-full mb-2")
+
+        with ui.expansion(_t("home.sync_help_title"), icon="help_outline").classes("w-full bg-[#1a1a1a] rounded border border-[#333] mb-4"):
+            ui.label(_t("home.sync_help_token_title")).classes("font-bold text-[var(--accent)] mt-2")
+            ui.label(_t("home.sync_help_token_1")).classes("text-sm text-gray-400")
+            ui.label(_t("home.sync_help_token_2")).classes("text-sm text-gray-400")
+            ui.label(_t("home.sync_help_token_3")).classes("text-sm text-gray-400")
+            ui.label(_t("home.sync_help_token_4")).classes("text-sm text-gray-400")
+            ui.label(_t("home.sync_help_token_warn")).classes("text-xs text-[var(--danger)] font-bold mt-1 mb-3")
+            
+            ui.label(_t("home.sync_help_server_title")).classes("font-bold text-[var(--accent)]")
+            ui.label(_t("home.sync_help_server_desc")).classes("text-sm text-gray-400 mb-2")
 
         status_label = ui.label("Listo para sincronizar.").style("color: var(--text-secondary); font-size: 0.85rem; font-weight: 500;")
         progress_bar = ui.linear_progress(value=0, show_value=False).classes("w-full my-2").props("stripe animated color=positive")
@@ -259,7 +270,7 @@ class HomePage:
                 
                 with self._grid_container:
                     if total_items == 0:
-                        self._render_empty_state()
+                        self._render_empty_state(is_totally_empty=True)
                     else:
                         self._render_grouped_recent(session)
                 return
@@ -343,13 +354,38 @@ class HomePage:
             self._current_page += 1
             self._load_schematics()
 
-    def _render_empty_state(self) -> None:
+    def _render_empty_state(self, is_totally_empty: bool = False) -> None:
         from app.i18n import _t
-        with ui.column().classes("empty-state items-center justify-center p-8"):
-            # Lottie animation web player
-            ui.html('<lottie-player src="https://lottie.host/890eb99f-e3c1-4560-afcb-ea31b54c8612/D7f232r9yD.json" background="transparent" speed="1" style="width: 220px; height: 220px; opacity: 0.8;" loop autoplay></lottie-player>')
-            ui.label(_t("home.empty_title", default="No se encontraron litemáticas")).classes("empty-title mt-2")
-            ui.label(_t("home.empty_subtitle", default="Prueba con otra categoría, etiqueta o término de búsqueda.")).classes("empty-subtitle text-center")
+        if is_totally_empty:
+            with ui.column().classes("w-full items-center justify-center p-8"):
+                ui.label(_t("home.empty_dashboard_title")).classes("text-3xl font-bold text-white mb-2")
+                ui.label(_t("home.empty_dashboard_subtitle")).classes("text-[var(--text-secondary)] mb-8")
+                
+                with ui.row().classes("w-full max-w-4xl gap-6 justify-center"):
+                    # Tarjeta 1: Discord
+                    with ui.card().classes("glass-panel flex-1 min-w-[250px] p-6 items-center text-center hover:border-[var(--accent)] transition-colors"):
+                        ui.icon("cloud_download", size="3rem").classes("text-[var(--accent)] mb-4")
+                        ui.label(_t("home.empty_dash_1_title")).classes("text-xl font-bold text-white mb-2")
+                        ui.label(_t("home.empty_dash_1_desc")).classes("text-sm text-gray-400")
+
+                    # Tarjeta 2: Importar
+                    with ui.card().classes("glass-panel flex-1 min-w-[250px] p-6 items-center text-center hover:border-[var(--accent)] transition-colors"):
+                        ui.icon("file_upload", size="3rem").classes("text-[#1bd96a] mb-4")
+                        ui.label(_t("home.empty_dash_2_title")).classes("text-xl font-bold text-white mb-2")
+                        ui.label(_t("home.empty_dash_2_desc")).classes("text-sm text-gray-400")
+                        
+                    # Tarjeta 3: Explorar
+                    with ui.card().classes("glass-panel flex-1 min-w-[250px] p-6 items-center text-center hover:border-[var(--accent)] transition-colors"):
+                        ui.icon("3d_rotation", size="3rem").classes("text-orange-400 mb-4")
+                        ui.label(_t("home.empty_dash_3_title")).classes("text-xl font-bold text-white mb-2")
+                        ui.label(_t("home.empty_dash_3_desc")).classes("text-sm text-gray-400")
+
+        else:
+            with ui.column().classes("empty-state items-center justify-center p-8"):
+                # Lottie animation web player
+                ui.html('<lottie-player src="https://lottie.host/890eb99f-e3c1-4560-afcb-ea31b54c8612/D7f232r9yD.json" background="transparent" speed="1" style="width: 220px; height: 220px; opacity: 0.8;" loop autoplay></lottie-player>')
+                ui.label(_t("home.empty_title", default="No se encontraron litemáticas")).classes("empty-title mt-2")
+                ui.label(_t("home.empty_subtitle", default="Prueba con otra categoría, etiqueta o término de búsqueda.")).classes("empty-subtitle text-center")
 
     def _render_grouped_recent(self, session) -> None:
         """Renderiza las construcciones agrupadas por categoría padre mostrando las más recientes (máximo 50 en total)."""

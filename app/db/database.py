@@ -62,3 +62,35 @@ def get_session() -> Generator[Session, None, None]:
 def get_session_direct() -> Session:
     """Retorna una sesión sin context manager. Recordar cerrar manualmente."""
     return Session(engine)
+
+def reset_database() -> None:
+    """
+    Peligro: Borra TODA la base de datos (drop_all), vacía las carpetas de schematics
+    y miniaturas, y borra la configuración de Discord.
+    """
+    import shutil
+    import os
+    from app.config import SCHEMATICS_DIR, THUMBNAILS_DIR, STORAGE_DIR
+
+    # 1. Destruir y recrear tablas
+    from app.db import models  # noqa: F401
+    SQLModel.metadata.drop_all(engine)
+    create_db_and_tables()
+
+    # 2. Purgar archivos de litematicas
+    if SCHEMATICS_DIR.exists():
+        shutil.rmtree(SCHEMATICS_DIR)
+    SCHEMATICS_DIR.mkdir(parents=True, exist_ok=True)
+
+    # 3. Purgar archivos de miniaturas
+    if THUMBNAILS_DIR.exists():
+        shutil.rmtree(THUMBNAILS_DIR)
+    THUMBNAILS_DIR.mkdir(parents=True, exist_ok=True)
+
+    # 4. Eliminar config de Discord
+    discord_cfg = STORAGE_DIR / "discord_config.json"
+    if discord_cfg.exists():
+        try:
+            os.remove(discord_cfg)
+        except Exception:
+            pass
