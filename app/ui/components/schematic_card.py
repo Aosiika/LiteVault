@@ -47,6 +47,8 @@ class SchematicCard:
 
         with ui.card().classes(
             f"schematic-card {'schematic-card-selected' if self._selected else ''} hover-float glass-panel"
+        ).props('draggable="true"').on(
+            "dragstart", f"(e) => {{ window.draggedSchematicId = {s.id}; }}"
         ) as card:
             self._card = card
 

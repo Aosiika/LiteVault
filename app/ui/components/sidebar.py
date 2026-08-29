@@ -184,7 +184,15 @@ class Sidebar:
 
         with ui.element("div").classes(
             f"category-item {'category-selected' if is_selected else ''} items-center justify-between"
-        ).style(f"padding-left: {indent_px}px;"):
+        ).style(f"padding-left: {indent_px}px; transition: background 0.2s;").on(
+            "dragover", "(e) => { e.preventDefault(); e.currentTarget.style.background = 'rgba(27, 217, 106, 0.2)'; }"
+        ).on(
+            "dragleave", "(e) => { e.currentTarget.style.background = ''; }"
+        ).on(
+            "drop", 
+            lambda e, cid=cat.id: self._handle_drop(e, cid),
+            args=["window.draggedSchematicId"]
+        ) as item:
             
             with ui.row().classes("items-center gap-1.5 flex-1 min-w-0"):
                 # Icono chevron expandible si tiene hijos
@@ -250,9 +258,31 @@ class Sidebar:
                         self.refresh()
                     except Exception as e:
                         ui.notify(_t("sidebar.delete_error", error=e), color="negative", icon="error")
-                        
-                ui.button(_t("sidebar.yes_delete_all"), on_click=_do_del).classes("btn-primary").style("background: var(--danger) !important; color: white !important;")
+                ui.button(_t("sidebar.yes_delete_all", default="Eliminar"), on_click=_do_del).classes("btn-primary").style("background: var(--danger) !important; color: white !important;")
         dialog.open()
+
+    def _handle_drop(self, e, target_cat_id: int) -> None:
+        ui.run_javascript("event.currentTarget.style.background = '';")
+        
+        schem_id_str = e.args
+        if not schem_id_str:
+            return
+            
+        try:
+            schem_id = int(schem_id_str)
+            with get_session() as session:
+                schem = session.get(Schematic, schem_id)
+                cat = session.get(Category, target_cat_id)
+                if schem and cat:
+                    schem.category_id = cat.id
+                    session.add(schem)
+                    session.commit()
+                    ui.notify(f"✓ Movido a {cat.name}", color="positive", position="bottom-right")
+                    
+                    # Llamar al recargo general (usando window.location.reload() o refrescando app)
+                    ui.run_javascript("setTimeout(() => window.location.reload(), 300);")
+        except Exception as exc:
+            print(f"Error drag/drop: {exc}")
 
     def _toggle_expand(self, category_id: int) -> None:
         if category_id in self._expanded_categories:
