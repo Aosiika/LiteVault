@@ -508,18 +508,79 @@ class HomePage:
     # FAB ─────────────────────────────────────────────────────────────────
 
     def _build_fab(self) -> None:
-        self._fab = ui.button(
-            "Descargar seleccionados",
-            icon="download",
-            on_click=self._download_selected,
-        ).classes("fab-download").style("display:none")
+        self._fab_container = ui.row().classes("fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#1a1a1a] border border-[#333] rounded-full p-2 shadow-lg items-center gap-2").style("display:none; z-index: 100;")
+        with self._fab_container:
+            self._fab_label = ui.label("0 seleccionados").classes("text-white font-bold ml-4 mr-2")
+            
+            ui.button(icon="folder", on_click=self._bulk_assign_category).props("round flat size=sm").classes("text-[var(--accent)]").tooltip("Asignar categoría")
+            ui.button(icon="delete", on_click=self._bulk_delete).props("round flat size=sm").classes("text-[var(--danger)]").tooltip("Eliminar")
+            
+            ui.separator().props("vertical").classes("mx-1")
+            
+            ui.button(icon="download", on_click=self._download_selected).props("round flat size=sm").classes("text-white").tooltip("Descargar")
+            ui.button(icon="close", on_click=self._clear_selection).props("round flat size=sm").classes("text-gray-400").tooltip("Limpiar selección")
 
     def _update_fab(self) -> None:
         if self._selected_ids:
-            self._fab.style("display:flex")
-            self._fab.text = f"Descargar {len(self._selected_ids)} seleccionados"
+            self._fab_container.style("display:flex")
+            self._fab_label.text = f"{len(self._selected_ids)} seleccionados"
         else:
-            self._fab.style("display:none")
+            self._fab_container.style("display:none")
+
+    def _clear_selection(self) -> None:
+        self._selected_ids.clear()
+        self._load_schematics()
+        self._update_fab()
+
+    def _bulk_delete(self) -> None:
+        if not self._selected_ids: return
+        with ui.dialog() as confirm:
+            confirm.open()
+            with ui.card().classes("dialog-card"):
+                ui.label(f"¿Eliminar {len(self._selected_ids)} litemáticas?").classes("dialog-title text-[var(--danger)]")
+                ui.label("Esta acción es irreversible y borrará los archivos del disco.").style("color:var(--text-secondary); font-size:0.85rem")
+                with ui.row().classes("justify-end gap-2 mt-4 w-full"):
+                    ui.button("Cancelar", on_click=confirm.close).classes("btn-secondary")
+                    def _do_delete():
+                        for sid in list(self._selected_ids):
+                            file_service.delete_schematic(sid)
+                        self._clear_selection()
+                        confirm.close()
+                        ui.notify("✓ Archivos eliminados", color="positive", position="bottom-right")
+                        if self._sidebar:
+                            self._sidebar.refresh()
+                    ui.button("Eliminar", icon="delete", on_click=_do_delete).classes("btn-primary text-white").style("background: var(--danger) !important;")
+
+    def _bulk_assign_category(self) -> None:
+        if not self._selected_ids: return
+        with ui.dialog() as dialog:
+            dialog.open()
+            with ui.card().classes("import-dialog-card w-[400px]"):
+                ui.label(f"Asignar categoría a {len(self._selected_ids)} litemáticas").classes("dialog-title")
+                
+                with get_session() as session:
+                    cats = session.exec(select(Category).order_by(Category.name)).all()
+                cat_options = {"": "— Sin categoría —"}
+                cat_options.update({str(c.id): c.name for c in cats})
+                cat_select = ui.select(options=cat_options, value="", label="Categoría").classes("w-full mt-4")
+
+                with ui.row().classes("justify-end gap-2 mt-6 w-full"):
+                    ui.button("Cancelar", on_click=dialog.close).classes("btn-secondary")
+                    def _do_assign():
+                        cid = int(cat_select.value) if cat_select.value else None
+                        with get_session() as s:
+                            for sid in self._selected_ids:
+                                schem = s.get(Schematic, sid)
+                                if schem:
+                                    schem.category_id = cid
+                                    s.add(schem)
+                            s.commit()
+                        self._clear_selection()
+                        dialog.close()
+                        ui.notify("✓ Categorías actualizadas", color="positive", position="bottom-right")
+                        if self._sidebar:
+                            self._sidebar.refresh()
+                    ui.button("Asignar", icon="check", on_click=_do_assign).classes("btn-primary text-white")
 
     # Diálogo de importación ───────────────────────────────────────────────
 
