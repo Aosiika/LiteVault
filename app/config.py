@@ -60,7 +60,6 @@ APP_TITLE = "LiteVault"
 WINDOW_WIDTH = 1400
 WINDOW_HEIGHT = 900
 
-# Paleta de colores inspirada en Minecraft & Modrinth
 COLORS = {
     "bg_base": "#111216",          # Bedrock profundo
     "bg_surface": "#17181d",       # Obsidian surface

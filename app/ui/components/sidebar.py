@@ -42,10 +42,8 @@ class Sidebar:
         self._build()
 
     def _init_expanded(self) -> None:
-        """Inicializa las categorías raíz como expandidas por defecto."""
-        with get_session() as session:
-            roots = session.exec(select(Category.id).where(Category.parent_id == None)).all()
-            self._expanded_categories = set(roots)
+        """Inicializa las categorías raíz como colapsadas por defecto."""
+        self._expanded_categories = set()
 
     # Build ──────────────────────────────────────────────────────────────
 
