@@ -89,7 +89,9 @@ async def download_and_install_update(download_url: str, progress_callback: Call
 set _MEIPASS2=
 set _MEIPASS=
 set _PYINSTALLER_INIT=
-start "" "{installer_path}" /SILENT
+timeout /t 2 /nobreak > nul
+start /wait "" "{installer_path}" /SILENT
+start "" "{sys.executable}"
 """
         with open(bat_path, "w") as f:
             f.write(bat_content)
