@@ -1,4 +1,4 @@
-#define MyAppVersion "1.1.0"
+#define MyAppVersion "1.1.1"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
@@ -18,7 +18,7 @@ RestartApplications=yes
 OutputDir=.\installer
 OutputBaseFilename=LiteVault_Setup_v{#MyAppVersion}
 SetupIconFile=.\logo.ico
-Compression=lzma
+Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 LicenseFile=.\license.txt

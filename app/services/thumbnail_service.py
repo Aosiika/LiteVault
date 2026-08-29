@@ -30,9 +30,10 @@ def _get_resource_pack():
 
         # Buscar en ubicaciones posibles del resource pack
         candidate_paths = [
-            BASE_DIR.parent / "minecraft-default-resource-pack-template-original-26.2.zip",
+            STATIC_DIR / "viewer3d" / "pack.zip",
             STATIC_DIR / "viewer" / "pack.zip",
             BASE_DIR / "viewer_src" / "public" / "pack.zip",
+            BASE_DIR.parent / "minecraft-default-resource-pack-template-original-26.2.zip",
         ]
 
         for p in candidate_paths:
