@@ -89,6 +89,11 @@ async def download_and_install_update(download_url: str, progress_callback: Call
 set _MEIPASS2=
 set _MEIPASS=
 set _PYINSTALLER_INIT=
+set _PYI_ARCHIVE_FILE=
+set _PYI_APPLICATION_HOME_DIR=
+set _PYI_PARENT_PROCESS_LEVEL=
+set _PYI_SPLASH_IPC=
+set PYINSTALLER_RESET_ENVIRONMENT=1
 timeout /t 2 /nobreak > nul
 start /wait "" "{installer_path}" /SILENT
 start "" "{sys.executable}"
