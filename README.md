@@ -1,84 +1,129 @@
 <div align="center">
-  <img src="app/assets/logo.png" alt="LiteVault Logo" width="128"/>
+  <img src="logo.png" alt="LiteVault Logo" width="128"/>
   <h1>LiteVault</h1>
+  <p><strong>The ultimate personal manager and 3D viewer for your Litematica schematics.</strong></p>
   <p><strong>El gestor personal y visor 3D definitivo para tus schematics de Litematica.</strong></p>
+  
+  <p>
+    <a href="#-english">🇺🇸 English</a> •
+    <a href="#-español">🇪🇸 Español</a>
+  </p>
 </div>
 
 <br/>
 
-## ✨ Características
-
-- 📦 **Gestión Local Segura**: Organiza todos tus `.litematic` en categorías personalizadas, con etiquetas y buscador instantáneo.
-- 🧊 **Visor 3D Integrado**: Previsualiza tus construcciones directamente en la aplicación gracias al motor *Three.js* y *Litematica-viewer*, sin necesidad de abrir Minecraft.
-- 🤖 **Extracción Automática de Metadatos**: Extrae bloques, dimensiones, nombre del autor y fecha de creación de cada schematic automáticamente.
-- 💬 **Sincronización con Discord**: Configura un bot para que lea un canal de Discord y se descargue automáticamente los schematics que pasen tus amigos.
-- 🎨 **Diseño Moderno**: Interfaz premium estilo "Glassmorphism" con tema oscuro, rápida e intuitiva.
-- 🔄 **Actualizaciones Automáticas**: El programa detecta automáticamente las nuevas versiones de GitHub y se actualiza con un solo clic.
-
 ---
 
-## 🚀 Instalación y Descarga
+## 🇺🇸 English
 
-Para usuarios normales que solo quieren usar la aplicación:
+### ✨ Features
+- 📦 **Secure Local Management**: Organize all your `.litematic` files into custom categories, with tags and an instant search engine.
+- 🧊 **Integrated 3D Viewer**: Preview your builds directly in the application thanks to the *Three.js* engine and *Litematica-viewer*, without needing to open Minecraft.
+- 🤖 **Automatic Metadata Extraction**: Automatically extracts block lists, dimensions, author name, and creation date for each schematic.
+- 💬 **Discord Sync**: Configure a bot to read a Discord channel and automatically download schematics shared by your friends.
+- 🎨 **Modern Design**: Premium "Glassmorphism" style interface with a dark theme—fast, sleek, and intuitive.
+- 🔄 **Automatic Updates**: The program automatically detects new versions on GitHub and updates itself with a single click.
 
-1. Ve a la pestaña de **[Releases](../../releases/latest)** en la parte derecha de este repositorio.
-2. Descarga el último archivo `LiteVault_Setup_vX.X.X.exe`.
-3. Ejecútalo, sigue los pasos del instalador y ¡listo!
+### 🚀 Installation & Download (For Users)
 
-> **Nota:** La aplicación es portátil dentro de su propia instalación; tu base de datos y tus archivos se guardan de forma segura en tu carpeta personal de documentos.
+1. Go to the **[Releases](../../releases/latest)** tab on the right side of this repository.
+2. Download the latest `LiteVault_Setup_vX.X.X.exe` file.
+3. Run it, follow the installer steps, and you're done!
 
----
+> **Note:** The application is entirely portable; your database and files are safely stored in your personal Documents folder.
 
-## 🛠️ Entorno de Desarrollo (Código Fuente)
+### 🛠️ Development Environment (For Developers)
 
-Si eres desarrollador y quieres modificar el código de LiteVault o compilarlo tú mismo:
+If you are a developer and want to modify the LiteVault source code or compile it yourself:
 
-### 1. Requisitos
+**Requirements:**
 - **Python 3.11+**
-- **Inno Setup 6** (Solo si quieres generar el `.exe` final)
+- **Inno Setup** (Only if you want to generate the final installer `.exe`)
 
-### 2. Instalación del entorno
-Clona el repositorio y crea un entorno virtual:
+**Setup Environment:**
 ```bash
 git clone https://github.com/Aosiika/LiteVault.git
 cd LiteVault
 python -m venv .venv
-# Activar entorno (Windows)
-.venv\Scripts\activate
-# Instalar dependencias
+.venv\Scripts\activate   # On Windows
 pip install -r requirements.txt
 ```
-*(Nota: Actualmente LiteVault utiliza `pyproject.toml` para la gestión de dependencias)*
 
-### 3. Ejecutar en modo desarrollo
+**Run in Development Mode:**
 ```bash
 python app/main.py
 ```
 
-### 4. Compilar el Ejecutable (PyInstaller)
-Si has hecho cambios y quieres generar un nuevo `LiteVault.exe`:
+**Compile Executable (PyInstaller):**
 ```bash
 pyinstaller build.spec --clean -y
 ```
 
 ---
 
-## 📚 Tecnologías y Agradecimientos
+## 🇪🇸 Español
 
-Este proyecto es de código abierto y ha sido posible gracias al trabajo increíble de la comunidad:
+### ✨ Características
+- 📦 **Gestión Local Segura**: Organiza todos tus `.litematic` en categorías personalizadas, con etiquetas y un buscador instantáneo.
+- 🧊 **Visor 3D Integrado**: Previsualiza tus construcciones directamente en la aplicación gracias al motor *Three.js* y *Litematica-viewer*, sin necesidad de abrir Minecraft.
+- 🤖 **Extracción Automática de Metadatos**: Extrae lista de bloques, dimensiones, nombre del autor y fecha de creación de cada schematic automáticamente.
+- 💬 **Sincronización con Discord**: Configura un bot para que lea un canal de Discord y se descargue automáticamente los schematics que compartan tus amigos.
+- 🎨 **Diseño Moderno**: Interfaz premium estilo "Glassmorphism" con tema oscuro, muy rápida e intuitiva.
+- 🔄 **Actualizaciones Automáticas**: El programa detecta automáticamente las nuevas versiones de GitHub y se actualiza con un solo clic.
 
-- **[Python](https://www.python.org/)** & **[NiceGUI](https://nicegui.io/)**: Backend y Framework de interfaz gráfica de la aplicación.
-- **[SQLite](https://www.sqlite.org/)** & **[SQLModel](https://sqlmodel.tiangolo.com/)**: Base de datos local, ligera y robusta.
-- **[maruohon/litematica](https://github.com/maruohon/litematica)**: Creador del formato original `.litematic` para Minecraft.
-- **[albertchen857/Litematica-viewer](https://github.com/albertchen857/Litematica-viewer)**: Librería central para desencriptar y parsear los archivos de litematica en JavaScript.
-- **[schematic-renderer](https://github.com/vberlier/schematic-renderer)**: Motor de renderizado en web basado en Three.js.
+### 🚀 Instalación y Descarga (Para Usuarios)
 
-## ⚖️ Aviso Legal (Disclaimer)
+1. Ve a la pestaña de **[Releases](../../releases/latest)** en la parte derecha de este repositorio.
+2. Descarga el último archivo `LiteVault_Setup_vX.X.X.exe`.
+3. Ejecútalo, sigue los pasos del instalador y ¡listo!
+
+> **Nota:** La aplicación es totalmente portable; tu base de datos y tus archivos se guardan de forma segura en tu carpeta personal de documentos.
+
+### 🛠️ Entorno de Desarrollo (Para Desarrolladores)
+
+Si eres desarrollador y quieres modificar el código de LiteVault o compilarlo tú mismo:
+
+**Requisitos:**
+- **Python 3.11+**
+- **Inno Setup** (Solo si quieres generar el `.exe` final)
+
+**Instalación del entorno:**
+```bash
+git clone https://github.com/Aosiika/LiteVault.git
+cd LiteVault
+python -m venv .venv
+.venv\Scripts\activate   # En Windows
+pip install -r requirements.txt
+```
+
+**Ejecutar en modo desarrollo:**
+```bash
+python app/main.py
+```
+
+**Compilar el Ejecutable (PyInstaller):**
+```bash
+pyinstaller build.spec --clean -y
+```
+
+---
+
+## 📚 Technologies / Tecnologías
+Este proyecto es de código abierto y ha sido posible gracias al trabajo increíble de la comunidad / *This project is open-source and has been made possible thanks to the amazing work of the community*:
+- **[Python](https://www.python.org/)** & **[NiceGUI](https://nicegui.io/)**: Backend and UI framework.
+- **[SQLite](https://www.sqlite.org/)** & **[SQLModel](https://sqlmodel.tiangolo.com/)**: Fast, lightweight local database.
+- **[maruohon/litematica](https://github.com/maruohon/litematica)**: Creator of the original `.litematic` format.
+- **[albertchen857/Litematica-viewer](https://github.com/albertchen857/Litematica-viewer)**: Core javascript library to decrypt and parse Litematica files.
+- **[schematic-renderer](https://github.com/vberlier/schematic-renderer)**: Web rendering engine based on Three.js.
+
+## ⚖️ Legal Disclaimer / Aviso Legal
+**LiteVault is a non-commercial open-source project.**
+We are not affiliated, associated, authorized, endorsed by, or in any way officially connected with **Mojang AB** or **Microsoft Corporation**. The name "Minecraft" and game assets are registered trademarks of Mojang AB.
 
 **LiteVault es un proyecto de código abierto no comercial.** 
 No estamos afiliados, asociados, autorizados, respaldados ni conectados oficialmente de ninguna manera con **Mojang AB** ni con **Microsoft Corporation**. El nombre "Minecraft" y los recursos del juego son marcas registradas de Mojang AB. 
 
 ---
 <div align="center">
-Desarrollado con ❤️ por <b>Aosika</b> | 2026
+Developed with ❤️ by <b>Aosika</b> | 2026
 </div>
