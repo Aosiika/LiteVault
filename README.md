@@ -8,6 +8,10 @@
     <a href="#-english">🇺🇸 English</a> •
     <a href="#-español">🇪🇸 Español</a>
   </p>
+
+  <p>
+    💬 <strong><a href="https://discord.gg/Z48fETQyXr">Official Discord Server / Servidor Oficial de Discord</a></strong>
+  </p>
 </div>
 
 <br/>
